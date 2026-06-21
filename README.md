@@ -1,38 +1,87 @@
-# Trendline trade logger
+# Trendline-walk backtest
 
-Foundation for the tier model. It captures every setup with full context at
-signal time, then the outcome at close. That logged table is your ML dataset.
+A mechanized version of the structural trendline-walk strategy on 1H bars,
+with a random-entry control to test where the edge comes from.
+
+## Setup
+
+```bash
+pip install -r requirements.txt   # numpy, matplotlib
+```
+
+Python 3.9+.
+
+## Run a backtest
+
+```bash
+# one symbol (sample gold file included)
+python run_backtest.py data/gold.csv
+
+# several at once -> per-symbol rows plus a portfolio line
+python run_backtest.py data/GC.csv data/SI.csv data/HG.csv data/PL.csv data/PA.csv
+
+# pin the start date
+python run_backtest.py data/GC.csv --start 2008-03-01 --name Gold
+```
+
+Output is per symbol: trades, win %, total R, average R, profit factor, and the
+long/short split.
+
+## Random-entry control (the monkey test)
+
+```bash
+python random_entry_control.py data/gold.csv --sims 500
+python random_entry_control.py data/GC.csv data/SI.csv data/HG.csv --sims 500 --plot monkey.png
+```
+
+Same trade counts, same exit engine, same stop sizing, only the entry bar and
+direction randomized. Reports the strategy total vs the random distribution and
+the z-score. A large positive z with ~0% of random runs beating the strategy
+means the edge is in the entry selection, not the exits or market drift.
+
+## CSV format
+
+`time,open,high,low,close[,volume]`
+
+The `time` column auto-detects:
+- epoch seconds (old TradingView exports) e.g. `1672700400`
+- epoch milliseconds e.g. `1672700400000`
+- datetime strings (FirstRateData) e.g. `2008-01-02 09:00:00`, `01/02/2008 09:00`, ISO 8601
+
+A header row is optional and skipped automatically. Rows are sorted ascending,
+so newest-first files are fine.
+
+## FirstRateData notes
+
+- The detector is percentage-based and R-based, so the contract multiplier does
+  not affect results. The cap is off by default. Use the **full-size**
+  continuous series (GC, SI, HG, PL, PA, NQ, ES, CL), not the micros, because
+  the full-size symbols go back to 2008 while the micros start 2010 to 2021.
+- Use the **ratio-adjusted** continuous series, since the detector measures
+  moves in percent and ratio adjustment preserves percentage gaps across rolls.
+- Keep the parameters frozen across symbols. If a symbol only works after
+  retuning, that is curve fitting, not an edge.
+
+## What is known so far
+
+- Validated on metals (gold, platinum) and holds out of sample on palladium,
+  silver, copper. Copper is the standout.
+- Crude oil fails outright. Energy is the wrong character for this strategy.
+- For trending instruments like equity indices (NQ, ES), read the random-entry
+  z-score, not the raw return. A long-biased entry makes money in a bull market
+  by accident; the monkey control separates skill from drift.
 
 ## Files
-- `feature_schema.py` defines `TradeRecord` and the feature list.
-- `sizing.py` maps model probability to tier and tier to risk and size.
-- `trade_logger.py` persists trades to CSV and loads them for training.
-- `example_usage.py` runs one signal through to close. Run it to smoke test.
 
-## The one rule that matters
-Fields are split into two groups:
-- SIGNAL TIME features: known when the setup forms. Model inputs only.
-- OUTCOME fields: known only after close. Labels only.
+- `backtest_hull.py` — detector, exit engine, flexible CSV loader, and the
+  shared `exit_sim` used by the control.
+- `run_backtest.py` — CLI to backtest one or many files.
+- `random_entry_control.py` — CLI Monte-Carlo random-entry control.
+- `data/gold.csv` — sample 1H gold series so everything runs out of the box.
 
-`SIGNAL_TIME_FEATURES` lists exactly what the model may see. Train only on
-those. If you ever feed an outcome field as an input, your backtest is lying
-to you. This split is what keeps the future out of the model.
+## Parameters
 
-## Risk per tier (your scheme)
-- C = 0.5%
-- B = 1.5%
-- A = 2.5% up to 4%, scaling with confidence inside the A band
-
-Probability thresholds in `sizing.py` are placeholders. Tune them on out of
-sample results, never on data the model trained on.
-
-## Run
-```
-python3 example_usage.py
-```
-
-## Note on the model
-The A/B/C decision is a classification on the signal time features. Try a
-gradient boosted tree (LightGBM) as the baseline before an LSTM. On tabular
-features it usually wins and needs far less data. Reserve the LSTM for the
-case where you feed it the raw price sequence into the signal.
+Defaults live in `run()` in `backtest_hull.py`: trendline tolerance, touch band,
+break tolerance, minimum 7-day span, minimum 3 touches separated by a bar gap,
+and the exit engine (200 EMA wick ratchet gated at 0.5R, breakeven at +1R,
+21 EMA close trail, parabolic exit at 3.5x ATR from the 21 EMA).
