@@ -33,6 +33,35 @@ from backtest_hull import run, load_series, ema, atr, exit_sim   # noqa: F401
 
 
 # --------------------------------------------------------------------------- #
+# Trade logger: append-only, fsynced so a crash leaves a record, not a hole.
+# This file is the source of truth for the paper-vs-backtest comparison.
+# --------------------------------------------------------------------------- #
+
+LOG_FILE = os.environ.get("TRADE_LOG", os.path.join(os.path.dirname(os.path.abspath(__file__)), "trade_log.csv"))
+_LOG_FIELDS = ["ts_utc", "event", "symbol", "mode", "dir", "qty",
+               "entry", "stop", "R_planned", "fill", "exit_px", "R_realized", "note"]
+
+def log_event(event, symbol, **f):
+    """Append one row. event in {signal, entry, stop_move, exit, error}."""
+    row = {k: "" for k in _LOG_FIELDS}
+    row["ts_utc"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    row["event"] = event
+    row["symbol"] = symbol
+    row.update({k: v for k, v in f.items() if k in _LOG_FIELDS})
+    new = not os.path.exists(LOG_FILE)
+    try:
+        with open(LOG_FILE, "a", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=_LOG_FIELDS)
+            if new:
+                w.writeheader()
+            w.writerow(row)
+            fh.flush()
+            os.fsync(fh.fileno())
+    except Exception as e:                       # logging must never crash the bot
+        print(f"[log] failed to write {event} for {symbol}: {e}")
+
+
+# --------------------------------------------------------------------------- #
 # Strategy core (no broker dependency, unit tested)
 # --------------------------------------------------------------------------- #
 
@@ -301,11 +330,22 @@ def main():
         action = "BUY" if sig["dir"] > 0 else "SELL"
         opp = "SELL" if sig["dir"] > 0 else "BUY"
         entry = MarketOrder(action, qty); entry.transmit = False
+        entry.tif = "GTC"; entry.outsideRth = True
         et = ib.placeOrder(contract, entry)
-        stop = StopOrder(opp, qty, sig["stop"]); stop.parentId = et.order.orderId; stop.transmit = True
-        stp = ib.placeOrder(contract, stop); ib.sleep(1)
+        stop = StopOrder(opp, qty, sig["stop"]); stop.parentId = et.order.orderId
+        stop.tif = "GTC"; stop.transmit = True
+        stp = ib.placeOrder(contract, stop)
+        # short wait to capture the actual fill price for the log
+        fill = None
+        for _ in range(15):
+            ib.waitOnUpdate(timeout=2)
+            if et.orderStatus.status == "Filled" and et.orderStatus.avgFillPrice:
+                fill = float(et.orderStatus.avgFillPrice); break
+            if et.orderStatus.status in ("Cancelled", "Inactive", "ApiCancelled"):
+                break
         return dict(con_id=contract.conId, qty=qty, stop_order_id=stp.order.orderId,
-                    entry=sig["entry"], stop=sig["stop"], R=sig["R"], dir=sig["dir"], phase=1)
+                    entry=sig["entry"], stop=sig["stop"], R=sig["R"], dir=sig["dir"], phase=1,
+                    fill=fill)
 
     def modify_stop(pos, newstop):
         for tr in ib.openTrades():
@@ -339,10 +379,14 @@ def main():
                 print(f"[{name}] EXIT @ {val:.2f}  ~{rr:+.2f}R")
                 if MODE != "shadow" or pos.get("live_managed"): close_position(pos)
                 state["realized_today"] += rr * RISK_DOLLARS
+                log_event("exit", name, mode=MODE, dir=pos["dir"], qty=pos.get("qty", ""),
+                          entry=round(pos["entry"], 4), exit_px=round(val, 4), R_realized=round(rr, 3),
+                          note=pos.get("why", ""))
                 del state["positions"][name]
             elif act == "modify_stop":
                 print(f"[{name}] move stop -> {val:.2f}")
                 if MODE != "shadow" or pos.get("live_managed"): modify_stop(pos, val)
+                log_event("stop_move", name, mode=MODE, dir=pos["dir"], stop=round(val, 4))
             save_state(state)
             return
 
@@ -360,7 +404,16 @@ def main():
             state["seen"][name] = sig["entry_ts"]
             side = "LONG" if sig["dir"] > 0 else "SHORT"
             print(f"[{name}] ENTRY {side} @ {sig['entry']:.2f} stop {sig['stop']:.2f} R={sig['R']:.2f}")
-            state["positions"][name] = sig if MODE == "shadow" else place_bracket(name, spec, sig)
+            log_event("signal", name, mode=MODE, dir=sig["dir"],
+                      entry=round(sig["entry"], 4), stop=round(sig["stop"], 4), R_planned=round(sig["R"], 4))
+            posrec = sig if MODE == "shadow" else place_bracket(name, spec, sig)
+            state["positions"][name] = posrec
+            if MODE != "shadow":
+                log_event("entry", name, mode=MODE, dir=sig["dir"], qty=posrec.get("qty", ""),
+                          entry=round(sig["entry"], 4), stop=round(sig["stop"], 4),
+                          R_planned=round(sig["R"], 4),
+                          fill=(round(posrec["fill"], 4) if posrec.get("fill") is not None else ""),
+                          note=("filled" if posrec.get("fill") is not None else "working"))
             save_state(state)
 
     # ---- test-trade: place the most recent detector signal on paper ------
@@ -438,6 +491,10 @@ def main():
         state["positions"][name] = dict(con_id=contract.conId, qty=qty,
                                         stop_order_id=stp.order.orderId, entry=ref, stop=stop_px,
                                         R=Rp, dir=d, phase=1, live_managed=True)
+        log_event("entry", name, mode="test-trade", dir=d, qty=qty,
+                  entry=round(ref, 4), stop=round(stop_px, 4), R_planned=round(Rp, 4),
+                  fill=(round(fill, 4) if fill is not None else ""),
+                  note=("filled" if fill is not None else f"working ({status})"))
         state["seen"][name] = ets                # don't also open this as a fresh signal
         save_state(state)
         print("  recorded; the exit engine will manage it each bar. Check the Gateway.\n")

@@ -1,0 +1,15 @@
+services:
+  ibgw:
+    image: ghcr.io/gnzsnz/ib-gateway:stable
+    restart: always
+    environment:
+      TWS_USERID: YOUR_PAPER_USERNAME
+      TWS_PASSWORD: YOUR_PAPER_PASSWORD
+      TRADING_MODE: paper
+      READ_ONLY_API: "no"
+      BYPASS_WARNING: "yes"
+      TRUSTED_IPS: "0.0.0.0/0"
+      TWOFA_TIMEOUT_ACTION: restart
+      AUTO_RESTART_TIME: "11:59 PM"
+    ports:
+      - "127.0.0.1:4002:4004"   # host 4002 -> container 4004 (gnzsnz paper API)
