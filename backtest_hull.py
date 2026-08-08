@@ -70,13 +70,13 @@ def exit_sim(O,H,L,C,e21,e200,A,t0,entry,stop,d):
     return ((C[-1]-entry)/R)*d
 
 def ema(x,n):
-    a=2/(n+1); o=np.empty_like(x,float); o[0]=x[0]
+    a=2/(n+1); o=np.zeros_like(x,float); o[0]=x[0]
     for i in range(1,len(x)): o[i]=a*x[i]+(1-a)*o[i-1]
     return o
 def atr(h,l,c,n=14):
-    tr=np.empty(len(c)); tr[0]=h[0]-l[0]
+    tr=np.zeros(len(c)); tr[0]=h[0]-l[0]
     for i in range(1,len(c)): tr[i]=max(h[i]-l[i],abs(h[i]-c[i-1]),abs(l[i]-c[i-1]))
-    o=np.empty(len(c)); o[0]=tr[0]; a=1/n
+    o=np.zeros(len(c)); o[0]=tr[0]; a=1/n
     for i in range(1,len(c)): o[i]=a*tr[i]+(1-a)*o[i-1]
     return o
 def pivots(h,l,k=3):
@@ -86,7 +86,25 @@ def pivots(h,l,k=3):
         if l[i]==l[i-k:i+k+1].min(): pl.append(i)
     return ph,pl
 
-def run(name,path,mult,start_ts,tol=0.0015,toltouch=0.0010,touch_band=0.0005,brk_tol=0.0002,SPANDAYS=7,K=3,MINSPAN=168,MINTOUCH=3,MAXSPAN=1200,CAP=4000.0,TGAP=6,causal=False,return_open=False,tick=0.0,slip_ticks=0.0):
+def run(name,path,mult,start_ts,tol=0.0015,toltouch=0.0010,touch_band=0.0005,brk_tol=0.0002,SPANDAYS=7,K=3,MINSPAN=168,MINTOUCH=3,MAXSPAN=1200,CAP=4000.0,TGAP=6,causal=True,return_open=False,tick=0.0,slip_ticks=0.0,slip_frac=0.0,fill='intrabar'):
+    # DEFAULTS ARE THE HONEST SETTINGS: causal=True, fill='intrabar'.
+    # To reproduce the older, inflated behaviour explicitly, pass
+    # causal=False, fill='open'. See README "What changed in this build".
+    # slip_frac: round-trip slippage as a FRACTION of price (e.g. 0.0002 = 2 bps/side),
+    #   deducted in R at exit. Use this for cross-symbol scans on ratio-adjusted data
+    #   where a fixed tick size has no clean mapping. tick/slip_ticks still work for a
+    #   single real contract.
+    # fill model for the entry:
+    #   'open'     LEGACY, no longer the default. Requires a break THROUGH the
+    #              line by `tol` and fills at the line, or at the bar open if it
+    #              gapped. Optimistic: it silently drops the marginal touches a
+    #              live resting order would take. Kept only for comparison.
+    #   'intrabar' (default) resting-stop model: trigger the moment price TOUCHES the line
+    #              (no break-through buffer) and fill at the line / gap open. Adds the
+    #              marginal touches a live resting order would take. Use with causal=True
+    #              and slip_ticks>0 for the honest number.
+    #   'next'     fill at the next bar open O[t+1] (the bundle audit's conservative fix).
+    intrabar = (fill=='intrabar'); nextbar = (fill=='next')
     T,O,H,L,C=load_series(path); n=len(C)
     e21=ema(C,21);e200=ema(C,200);A=atr(H,L,C,14)
     PH,PL=pivots(H,L,K)
@@ -125,9 +143,13 @@ def run(name,path,mult,start_ts,tol=0.0015,toltouch=0.0010,touch_band=0.0005,brk
                 if (sign>0 and np.any(L[p1:t]<lnz-brk_tol*L[p1:t])) or (sign<0 and np.any(H[p1:t]>lnz+brk_tol*H[p1:t])): continue
                 lnt=arr[p1]+s*(t-p1); lnp=arr[p1]+s*(t-1-p1)
                 if sign>0:
-                    if not (L[t]<lnt-tol*L[t] and L[t-1]>=lnp-brk_tol*L[t-1]): continue
+                    if intrabar:
+                        if not (L[t]<=lnt and L[t-1]>lnp): continue
+                    elif not (L[t]<lnt-tol*L[t] and L[t-1]>=lnp-brk_tol*L[t-1]): continue
                 else:
-                    if not (H[t]>lnt+tol*H[t] and H[t-1]<=lnp+brk_tol*H[t-1]): continue
+                    if intrabar:
+                        if not (H[t]>=lnt and H[t-1]<lnp): continue
+                    elif not (H[t]>lnt+tol*H[t] and H[t-1]<=lnp+brk_tol*H[t-1]): continue
                 if causal:
                     zz=np.arange(p1,t); lnz=arr[p1]+s*(zz-p1)
                     g=(arr[p1:t]-lnz) if sign>0 else (lnz-arr[p1:t])
@@ -181,8 +203,9 @@ def run(name,path,mult,start_ts,tol=0.0015,toltouch=0.0010,touch_band=0.0005,brk
                     elif C[t]>e21[t]: ex=C[t];why='21EMA'
             if ex is not None:
                 rr=((ex-pos['entry'])/pos['R'])*d
-                if slip_ticks and tick and pos['R']:        # entry + exit slippage, in R
-                    rr-=(2.0*slip_ticks*tick)/pos['R']
+                if pos['R']:                                 # entry + exit slippage, in R
+                    if slip_ticks and tick: rr-=(2.0*slip_ticks*tick)/pos['R']
+                    if slip_frac:           rr-=(2.0*slip_frac*pos['entry'])/pos['R']
                 pos.update(exit_idx=int(t),exit=round(float(ex),4),R=round(rr,3),why=why,stop_final=round(float(pos['stop']),4),ratcheted=bool(abs(pos['stop']-pos['stop0'])>1e-6)); trades.append(pos); pos=None
             else:
                 if pos['phase']==1:
@@ -199,7 +222,9 @@ def run(name,path,mult,start_ts,tol=0.0015,toltouch=0.0010,touch_band=0.0005,brk
             m=sl_low(a,b)
             if m<=0 or (t-a)<MINSPAN or (t-a)>MAXSPAN: continue
             lt=L[a]+m*(t-a); lp=L[a]+m*(t-1-a)
-            if not (L[t]<lt-tol*L[t] and L[t-1]>=lp-tol*L[t-1]): continue
+            if intrabar:
+                if not (L[t]<=lt and L[t-1]>lp): continue
+            elif not (L[t]<lt-tol*L[t] and L[t-1]>=lp-tol*L[t-1]): continue
             # respected: no low below line over [a, t-1]
             zz=np.arange(a,t)
             if np.any(L[a:t] < L[a]+m*(zz-a) - tol*L[a:t]): continue
@@ -207,7 +232,12 @@ def run(name,path,mult,start_ts,tol=0.0015,toltouch=0.0010,touch_band=0.0005,brk
             if rf is None: continue
             a2,m2,last2,tch=rf
             lt=L[a2]+m2*(t-a2)
-            floor=1.0*A[t]; entry=O[t] if O[t]<lt else lt
+            if nextbar:
+                if t+1>=n: continue
+                entry=O[t+1]
+            else:
+                entry=O[t] if O[t]<lt else lt
+            floor=1.0*A[t]
             cands=[]
             for j in range(1,len(rh)):
                 aa,bb=rh[j-1],rh[j]; mm=(H[bb]-H[aa])/(bb-aa); val=H[aa]+mm*(t-aa)
@@ -228,14 +258,21 @@ def run(name,path,mult,start_ts,tol=0.0015,toltouch=0.0010,touch_band=0.0005,brk
                 m=sl_high(a,b)
                 if m>=0 or (t-a)<MINSPAN or (t-a)>MAXSPAN: continue
                 lt=H[a]+m*(t-a); lp=H[a]+m*(t-1-a)
-                if not (H[t]>lt+tol*H[t] and H[t-1]<=lp+tol*H[t-1]): continue
+                if intrabar:
+                    if not (H[t]>=lt and H[t-1]<lp): continue
+                elif not (H[t]>lt+tol*H[t] and H[t-1]<=lp+tol*H[t-1]): continue
                 zz=np.arange(a,t)
                 if np.any(H[a:t] > H[a]+m*(zz-a) + tol*H[a:t]): continue
                 rf=refit(PH,H,-1,a,m,t,set(rh))
                 if rf is None: continue
                 a2,m2,last2,tch=rf
                 lt=H[a2]+m2*(t-a2)
-                floor=1.0*A[t]; entry=O[t] if O[t]>lt else lt
+                if nextbar:
+                    if t+1>=n: continue
+                    entry=O[t+1]
+                else:
+                    entry=O[t] if O[t]>lt else lt
+                floor=1.0*A[t]
                 cands=[]
                 for j in range(1,len(sh)):
                     aa,bb=sh[j-1],sh[j]; mm=(L[bb]-L[aa])/(bb-aa); val=L[aa]+mm*(t-aa)

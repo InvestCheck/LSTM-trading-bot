@@ -1,0 +1,10 @@
+DATA_DIR/
+data_archive/
+archive/
+*.zip
+__pycache__/
+*.pyc
+tier_data/
+trade_review.html
+live_state.json
+.DS_Store

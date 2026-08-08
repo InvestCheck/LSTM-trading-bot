@@ -7,6 +7,14 @@ Usage:
   python3 batch_backtest.py MGC PL HG SI PA    only these symbols
   python3 batch_backtest.py --maxspan 1200     different span
   python3 batch_backtest.py --warmup-days 60   history required before the first entry
+  python3 batch_backtest.py --fill intrabar    fill model: one of {open, intrabar, next}
+  python3 batch_backtest.py --no-causal        disable causal detection (default: causal on)
+  python3 batch_backtest.py --legacy           inflated legacy mode (fill=open, causal=off)
+
+Defaults are the published configuration: fill='intrabar', causal=True. --fill must be
+one of {open, intrabar, next}; any other value is a hard error. --legacy restores the old
+fill='open', causal=False behaviour and prints a warning because those numbers are inflated
+and are NOT the published result.
 
 Each symbol just needs seed/<SYM>.csv with columns time,open,high,low,close,volume
 (epoch or datetime, the loader handles both). Drop in MGC, PL, HG, SI, PA, MCL, NQ, etc.
@@ -40,8 +48,12 @@ def iso(ts):
     return datetime.fromtimestamp(int(ts), timezone.utc).strftime("%Y-%m-%d %H:%M")
 
 
+VALID_FILL = ("open", "intrabar", "next")
+
+
 def parse_args(argv):
-    syms, maxspan, warmup, slip = [], MAXSPAN, WARMUP_DAYS, 0
+    syms, maxspan, warmup, slip, fill, causal = [], MAXSPAN, WARMUP_DAYS, 0, 'intrabar', True
+    legacy = False
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -51,9 +63,23 @@ def parse_args(argv):
             warmup = int(argv[i + 1]); i += 2
         elif a == "--slip":
             slip = float(argv[i + 1]); i += 2
+        elif a == "--fill":
+            fill = argv[i + 1]; i += 2
+            if fill not in VALID_FILL:
+                sys.exit(f"error: --fill must be one of {{{', '.join(VALID_FILL)}}}, "
+                         f"got {fill!r}")
+        elif a == "--no-causal":
+            causal = False; i += 1
+        elif a == "--legacy":
+            legacy = True; i += 1
         else:
             syms.append(a); i += 1
-    return syms, maxspan, warmup, slip
+    # --legacy wins regardless of flag order: force the inflated config after parsing.
+    if legacy:
+        fill, causal = 'open', False
+        print("WARNING: --legacy uses fill='open', causal=False. These numbers are "
+              "inflated and are NOT the published result.", file=sys.stderr)
+    return syms, maxspan, warmup, slip, fill, causal
 
 
 def write_trades(path, sym, trades, T):
@@ -72,7 +98,7 @@ def write_trades(path, sym, trades, T):
 
 
 def main():
-    syms, maxspan, warmup, slip = parse_args(sys.argv)
+    syms, maxspan, warmup, slip, fill, causal = parse_args(sys.argv)
     if not syms:
         syms = sorted(os.path.splitext(os.path.basename(p))[0]
                       for p in glob.glob(os.path.join(SEED_DIR, "*.csv")))
@@ -81,7 +107,7 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
 
     cost = f", slippage {slip} tick/side" if slip else ""
-    print(f"MAXSPAN {maxspan}, warmup {warmup}d{cost}, {len(syms)} symbol(s)\n")
+    print(f"MAXSPAN {maxspan}, warmup {warmup}d, fill={fill}, causal={causal}{cost}, {len(syms)} symbol(s)\n")
     header = f"{'symbol':8s} {'trades':>6s} {'win%':>5s} {'totalR':>8s} {'avgR':>6s} {'PF':>5s}  range"
     print(header); print("-" * len(header))
     port_R, port_tr = 0.0, 0
@@ -95,7 +121,7 @@ def main():
         T, O, H, L, C = load_series(path)
         start_ts = int(T.min()) + warmup * 86400
         summ, trades, _, _ = run(sym, path, 1.0, start_ts, CAP=1e12, MAXSPAN=maxspan,
-                                 tick=tick, slip_ticks=slip)
+                                 tick=tick, slip_ticks=slip, fill=fill, causal=causal)
         write_trades(os.path.join(OUT_DIR, f"trades_{sym}.csv"), sym, trades, T)
         pf = summ["PF"] if summ["PF"] is not None else 0
         rng = f"{iso(T.min())[:10]}..{iso(T.max())[:10]}"

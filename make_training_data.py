@@ -20,7 +20,7 @@ from backtest_hull import run, load_series
 
 SEED_DIR = "seed"
 OUT = "tier_data"
-MAXSPAN = 1200
+MAXSPAN = 10**90      # effectively unbounded (no line is ever this old); same effect as 10**9
 WARMUP_DAYS = 60
 TEST_FRAC = 0.30                       # last 30% by time is the holdout
 METALS = ["MGC", "PL", "PA", "SI", "HG"]
@@ -38,7 +38,8 @@ def iso(ts):
 def rows_for(sym, path):
     T, O, H, L, C = load_series(path)
     st = int(T.min()) + WARMUP_DAYS * 86400
-    _, trades, _, _ = run(sym, path, 1.0, st, CAP=1e12, MAXSPAN=MAXSPAN)
+    _, trades, _, _ = run(sym, path, 1.0, st, CAP=1e12, MAXSPAN=MAXSPAN,
+                          causal=True, fill="intrabar")   # leak free features + realistic labels
     out = []
     for tr in trades:
         ets = int(T[tr["t0"]]); entry = tr["entry"]; Rpx = abs(entry - tr["stop0"])

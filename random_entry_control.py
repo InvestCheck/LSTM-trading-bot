@@ -4,18 +4,27 @@
 For each CSV it runs the real strategy, then runs a Monte-Carlo set of random
 entries with the SAME trade count, the SAME exit engine, and the SAME stop
 sizing (each symbol's median ATR stop distance). Only the entry bar and the
-direction are randomized. It reports whether the strategy beats the random
-distribution and by how many standard deviations, and can save a histogram.
+direction are randomized.
 
-This is the test of whether the edge lives in the entry selection or just in
-the exits / market drift. On the metals the strategy sits ~5.8 sigma above the
-random mean with zero random runs beating it.
+IMPORTANT (read before trusting the z-score):
+  - The strategy arm now runs CAUSAL=True, FILL='intrabar' by default, so it is
+    NOT lookahead-inflated and it matches how the strategy actually enters. The
+    older default (causal off, break-through fill) produced an inflated z because
+    it compared a lookahead strategy against clean random entries.
+  - This control randomizes BOTH the entry bar AND the direction. So a high z
+    means "real entries at real times beat random times with random direction,
+    given matched stop size". It does NOT isolate direction. A separate matched
+    null (random direction on the real signal bars) is what tells you whether the
+    break's directional call carries the edge; on the metals that test found
+    direction barely matters, so do not read this z as proof the entry signal is
+    the edge. Treat a modest z here as expected, not as failure.
 
 Examples
 --------
-    python random_entry_control.py data/gold.csv --sims 500
-    python random_entry_control.py data/GC.csv data/SI.csv data/HG.csv \
+    python random_entry_control.py seed/GC.csv --sims 500
+    python random_entry_control.py seed/GC.csv seed/PL.csv seed/HG.csv \
         --sims 500 --plot monkey.png
+    python random_entry_control.py seed/GC.csv --fill open --no-causal   # old behaviour
 """
 import argparse, os
 import numpy as np
@@ -27,9 +36,16 @@ def main():
     ap.add_argument("paths", nargs="+", help="one or more OHLC csv files")
     ap.add_argument("--sims", type=int, default=500, help="Monte-Carlo iterations")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--maxspan", type=int, default=1200)
+    ap.add_argument("--fill", default="intrabar", choices=["open", "intrabar", "next"],
+                    help="strategy-arm fill model (default intrabar = honest)")
+    ap.add_argument("--no-causal", dest="causal", action="store_false",
+                    help="turn OFF causal pivot confirmation (reproduces old inflated behaviour)")
+    ap.set_defaults(causal=True)
     ap.add_argument("--plot", default=None, help="save a histogram PNG to this path")
     args = ap.parse_args()
     np.random.seed(args.seed)
+    print(f"strategy arm: fill={args.fill}, causal={args.causal}, maxspan={args.maxspan}\n")
 
     SD = {}
     strat_total = 0.0
@@ -38,7 +54,8 @@ def main():
         T, O, H, L, C = load_series(p)
         e21, e200, A = ema(C, 21), ema(C, 200), atr(H, L, C)
         start = int(T.min()) + 60 * 86400
-        s, tr, _, _ = run(name, p, 1.0, start, CAP=1e12)
+        s, tr, _, _ = run(name, p, 1.0, start, CAP=1e12, MAXSPAN=args.maxspan,
+                          fill=args.fill, causal=args.causal)
         if not tr:
             continue
         katr = float(np.median([abs(x["entry"] - x["stop0"]) / A[x["t0"]] for x in tr]))
@@ -63,7 +80,7 @@ def main():
                     ssum += r
         tot[it] = ssum
 
-    z = (strat_total - tot.mean()) / tot.std()
+    z = (strat_total - tot.mean()) / tot.std() if tot.std() else float("nan")
     print(f"strategy total      : {strat_total:+.1f}R")
     print(f"random mean (n={M:<4d}): {tot.mean():+.1f}R   std {tot.std():.1f}   best {tot.max():+.1f}R")
     print(f"random 5th..95th    : {np.percentile(tot,5):+.1f}R .. {np.percentile(tot,95):+.1f}R")
