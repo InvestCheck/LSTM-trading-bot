@@ -1,0 +1,4 @@
+,symbols,trades,totalR,mean_PF
+"old(open,causalF)",131,16759,4432.0,2.19
+intrabar 1200,131,70347,-3062.1,1.03
+intrabar (max span),131,107867,-8860.1,1.02
