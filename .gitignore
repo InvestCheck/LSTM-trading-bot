@@ -5,6 +5,6 @@ archive/
 __pycache__/
 *.pyc
 tier_data/
-trade_review.html
+trade_review*.html
 live_state.json
 .DS_Store
