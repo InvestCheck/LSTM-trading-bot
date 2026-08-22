@@ -51,28 +51,23 @@ def parse_cfg(s):
     return lo, hi
 
 
-def _cluster_boot(times, R, B, n_inst, seed=0):
-    """Calendar-block bootstrap over the pooled cross-section.
-
-    The naive pooled t treats every trade as an independent draw. It is not: the
-    strategy holds correlated positions simultaneously across many instruments,
-    so a month in which metals trended is one event expressed dozens of times.
-    Resampling whole months across ALL instruments together keeps those
-    simultaneous trades bound to each other, which is the dependence the naive
-    statistic ignores.
-    """
+def _blocks_by(times, freq):
     from datetime import datetime, timezone
-    order = np.argsort(times)
-    R, times = R[order], times[order]
-    keys = [(datetime.fromtimestamp(int(t), timezone.utc).year,
-             datetime.fromtimestamp(int(t), timezone.utc).month) for t in times]
+    keys = []
+    for t in times:
+        dt = datetime.fromtimestamp(int(t), timezone.utc)
+        keys.append((dt.year, dt.month) if freq == "month" else
+                    (dt.year, (dt.month - 1) // 3) if freq == "quarter" else (dt.year,))
     blocks, cur, prev = [], [], None
     for i, k in enumerate(keys):
         if prev is not None and k != prev:
             blocks.append(np.array(cur)); cur = []
         cur.append(i); prev = k
     blocks.append(np.array(cur))
+    return blocks
 
+
+def _boot_t(R, blocks, B, seed=0):
     n = R.size
     t_obs = R.mean() / (R.std(ddof=1) / math.sqrt(n))
     xc = R - R.mean()
@@ -86,11 +81,35 @@ def _cluster_boot(times, R, B, n_inst, seed=0):
         sd = y.std(ddof=1)
         ts[b] = y.mean() / (sd / math.sqrt(y.size)) if sd > 0 else 0.0
     sd_boot = float(ts.std(ddof=1))
-    p = float(np.mean(np.abs(ts) >= abs(t_obs)))
-    print(f"{'cluster boot':>18s} {nb:7d} months  naive t {t_obs:+.2f}  "
-          f"inflation {sd_boot:.2f}  t_adj {t_obs/sd_boot:+.2f}  p {p:.4f}")
-    print(f"{'':>18s}         {n_inst} instruments pooled; inflation is how much the "
-          f"naive t overstates")
+    return t_obs, sd_boot, float(np.mean(np.abs(ts) >= abs(t_obs)))
+
+
+def _cluster_boot(times, R, B, n_inst, ticks=None, seed=0):
+    """Calendar-block bootstrap over the pooled cross-section.
+
+    The naive pooled t treats every trade as an independent draw. It is not: the
+    strategy holds correlated positions simultaneously across many instruments,
+    so a month in which metals trended is one event expressed dozens of times.
+    Resampling whole months across ALL instruments together keeps those
+    simultaneous trades bound to each other, which is the dependence the naive
+    statistic ignores.
+    """
+    order = np.argsort(times)
+    R, times = R[order], times[order]
+    net = R - 2.0 / ticks[order] if ticks is not None else None
+
+    print(f"{'':>18s} pooled cluster bootstrap, {n_inst} instruments, {B} resamples")
+    print(f"{'':>18s} {'blocks':>8s} {'count':>6s} {'series':>7s} "
+          f"{'naive t':>8s} {'infl':>6s} {'t_adj':>7s} {'p':>8s}")
+    for freq in ("month", "quarter", "year"):
+        blocks = _blocks_by(times, freq)
+        for label, x in (("gross", R), ("net@1", net)):
+            if x is None:
+                continue
+            t_obs, sd, p = _boot_t(x, blocks, B, seed)
+            print(f"{'':>18s} {freq:>8s} {len(blocks):6d} {label:>7s} "
+                  f"{t_obs:+8.2f} {sd:6.2f} {t_obs/sd:+7.2f} {p:8.4f}")
+    print(f"{'':>18s} net@1 is the tradeable series: gross R minus 2 ticks per trade.")
 
 
 def main():
@@ -180,7 +199,7 @@ def main():
         print(f"{lo:>8d}..{hi:<8d} {R.size:7d} {gross:+9.1f} {R.mean():+11.4f} "
               f"{med:10.1f} {2.0/med:9.1%} {gross-cost_half:+9.1f} {gross-cost_one:+9.1f}")
         if a.cluster_boot:
-            _cluster_boot(np.concatenate(allT), R, a.cluster_boot, kept)
+            _cluster_boot(np.concatenate(allT), R, a.cluster_boot, kept, ticks=ticks)
         if cut is not None:
             for label, part in (("  pre", preR), (" post", postR)):
                 x = np.concatenate(part)
