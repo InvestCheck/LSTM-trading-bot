@@ -5,7 +5,14 @@ and writes trades_<SYM>.csv per symbol for the tier model.
 Usage:
   python3 batch_backtest.py                   every seed/*.csv at MAXSPAN 24000
   python3 batch_backtest.py MGC PL HG SI PA    only these symbols
-  python3 batch_backtest.py --maxspan 1200     different span
+  python3 batch_backtest.py --maxspan 1200     different span ceiling
+  python3 batch_backtest.py --minspan 2160     different span floor. MINSPAN/MAXSPAN
+                                               bound how long a trendline must have
+                                               been forming before a break counts.
+                                               Defaults 168/1200 = 7 to 50 days on 1h
+                                               bars. A top-down structural config is
+                                               nearer --minspan 2160 --maxspan 17520
+                                               (3 months to 2 years).
   python3 batch_backtest.py --warmup-days 60   history required before the first entry
   python3 batch_backtest.py --fill intrabar    fill model: one of {open, intrabar, next}
   python3 batch_backtest.py --no-causal        disable causal detection (default: causal on)
@@ -35,6 +42,7 @@ from backtest_hull import run, load_series
 SEED_DIR = "seed"
 OUT_DIR = "backtests"
 MAXSPAN = 1200
+MINSPAN = 168
 WARMUP_DAYS = 60
 
 # Tick sizes come from instruments.py, which covers all 131 scanned symbols.
@@ -86,11 +94,14 @@ def parse_args(argv):
     syms, maxspan, warmup, slip, fill, causal = [], MAXSPAN, WARMUP_DAYS, 0, 'intrabar', True
     legacy = False
     data_dir = SEED_DIR
+    minspan = MINSPAN
     i = 1
     while i < len(argv):
         a = argv[i]
         if a == "--maxspan":
             maxspan = int(argv[i + 1]); i += 2
+        elif a == "--minspan":
+            minspan = int(argv[i + 1]); i += 2
         elif a == "--warmup-days":
             warmup = int(argv[i + 1]); i += 2
         elif a == "--slip":
@@ -113,7 +124,9 @@ def parse_args(argv):
         fill, causal = 'open', False
         print("WARNING: --legacy uses fill='open', causal=False. These numbers are "
               "inflated and are NOT the published result.", file=sys.stderr)
-    return syms, maxspan, warmup, slip, fill, causal, data_dir
+    if minspan >= maxspan:
+        sys.exit(f"error: --minspan {minspan} must be below --maxspan {maxspan}")
+    return syms, maxspan, minspan, warmup, slip, fill, causal, data_dir
 
 
 def write_trades(path, sym, trades, T):
@@ -132,7 +145,7 @@ def write_trades(path, sym, trades, T):
 
 
 def main():
-    syms, maxspan, warmup, slip, fill, causal, data_dir = parse_args(sys.argv)
+    syms, maxspan, minspan, warmup, slip, fill, causal, data_dir = parse_args(sys.argv)
     catalog = build_catalog(data_dir)
     if not catalog:
         print(f"no .txt or .csv files in {data_dir}/. pass --data-dir to point at "
@@ -149,8 +162,8 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
 
     cost = f", slippage {slip} tick/side" if slip else ""
-    print(f"MAXSPAN {maxspan}, warmup {warmup}d, fill={fill}, causal={causal}{cost}, "
-          f"{len(syms)} symbol(s) from {data_dir}/\n")
+    print(f"span {minspan}..{maxspan} bars, warmup {warmup}d, fill={fill}, "
+          f"causal={causal}{cost}, {len(syms)} symbol(s) from {data_dir}/\n")
     header = f"{'symbol':8s} {'trades':>6s} {'win%':>5s} {'totalR':>8s} {'avgR':>6s} {'PF':>5s}  range"
     print(header); print("-" * len(header))
     port_R, port_tr = 0.0, 0
@@ -159,7 +172,7 @@ def main():
         tick = TICKS.get(sym, 0.0)
         T, O, H, L, C = load_series(path)
         start_ts = int(T.min()) + warmup * 86400
-        summ, trades, _, _ = run(sym, path, 1.0, start_ts, CAP=1e12, MAXSPAN=maxspan,
+        summ, trades, _, _ = run(sym, path, 1.0, start_ts, CAP=1e12, MAXSPAN=maxspan, MINSPAN=minspan,
                                  tick=tick, slip_ticks=slip, fill=fill, causal=causal)
         write_trades(os.path.join(OUT_DIR, f"trades_{sym}.csv"), sym, trades, T)
         pf = summ["PF"] if summ["PF"] is not None else 0
