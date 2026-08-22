@@ -149,4 +149,7 @@ holdout did not.*
 
 ---
 
-**Committed:** _(fill in commit hash and date before running anything)_
+**Committed:** `884416cfeda5eaba0e572c75cac2675b995ac592`, 2026-08-22 07:09:33 -0400.
+This annotation was added in the following commit; the protocol content is
+unchanged from the hash above, which is verifiable with
+`git show 884416c:holdout_protocol_stage2.md`.
