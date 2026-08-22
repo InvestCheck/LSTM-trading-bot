@@ -29,6 +29,7 @@ good out of four, the correction is for four.
 """
 import argparse
 import os
+import math
 import statistics as st
 import sys
 
@@ -50,6 +51,48 @@ def parse_cfg(s):
     return lo, hi
 
 
+def _cluster_boot(times, R, B, n_inst, seed=0):
+    """Calendar-block bootstrap over the pooled cross-section.
+
+    The naive pooled t treats every trade as an independent draw. It is not: the
+    strategy holds correlated positions simultaneously across many instruments,
+    so a month in which metals trended is one event expressed dozens of times.
+    Resampling whole months across ALL instruments together keeps those
+    simultaneous trades bound to each other, which is the dependence the naive
+    statistic ignores.
+    """
+    from datetime import datetime, timezone
+    order = np.argsort(times)
+    R, times = R[order], times[order]
+    keys = [(datetime.fromtimestamp(int(t), timezone.utc).year,
+             datetime.fromtimestamp(int(t), timezone.utc).month) for t in times]
+    blocks, cur, prev = [], [], None
+    for i, k in enumerate(keys):
+        if prev is not None and k != prev:
+            blocks.append(np.array(cur)); cur = []
+        cur.append(i); prev = k
+    blocks.append(np.array(cur))
+
+    n = R.size
+    t_obs = R.mean() / (R.std(ddof=1) / math.sqrt(n))
+    xc = R - R.mean()
+    rng = np.random.default_rng(seed)
+    nb = len(blocks)
+    draw = int(math.ceil(n / max(1.0, n / nb))) + 2
+    ts = np.empty(B)
+    for b in range(B):
+        pick = rng.integers(0, nb, size=draw)
+        y = np.concatenate([xc[blocks[j]] for j in pick])[:n]
+        sd = y.std(ddof=1)
+        ts[b] = y.mean() / (sd / math.sqrt(y.size)) if sd > 0 else 0.0
+    sd_boot = float(ts.std(ddof=1))
+    p = float(np.mean(np.abs(ts) >= abs(t_obs)))
+    print(f"{'cluster boot':>18s} {nb:7d} months  naive t {t_obs:+.2f}  "
+          f"inflation {sd_boot:.2f}  t_adj {t_obs/sd_boot:+.2f}  p {p:.4f}")
+    print(f"{'':>18s}         {n_inst} instruments pooled; inflation is how much the "
+          f"naive t overstates")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default="seed")
@@ -57,6 +100,12 @@ def main():
                     default=["168:1200", "720:4320", "2160:17520", "168:99999999"])
     ap.add_argument("--symbols", nargs="*", default=None)
     ap.add_argument("--warmup-days", type=int, default=60)
+    ap.add_argument("--cluster-boot", type=int, default=0, metavar="B",
+                    help="B resamples of a calendar-block bootstrap over the POOLED "
+                         "trade set. Resamples whole months across all instruments "
+                         "together, so simultaneous correlated positions move as one "
+                         "draw. The pooled naive t assumes every trade is independent "
+                         "and is badly overstated; this is the honest version.")
     ap.add_argument("--split-at", default=None,
                     help="YYYY-MM-DD; report each config split into pre and post. "
                          "Not a holdout: this data has already been used. It only "
@@ -87,6 +136,7 @@ def main():
     for lo, hi in cfgs:
         allR, allticks, kept = [], [], 0
         preR, postR = [], []
+        allT = []
         for s in syms:
             tick = TICKS.get(s)
             if not tick:
@@ -111,8 +161,9 @@ def main():
                 continue          # unexecutable at any span, not a span question
             allR.append(R)
             allticks.append(rpx / tick)
+            ts = np.array([T[t["t0"]] for t in trades], float)[ok]
+            allT.append(ts)
             if cut is not None:
-                ts = np.array([T[t["t0"]] for t in trades], float)[ok]
                 preR.append(R[ts < cut]); postR.append(R[ts >= cut])
             kept += 1
 
@@ -128,6 +179,8 @@ def main():
         cost_one = float((2 * 1.0 / ticks).sum())
         print(f"{lo:>8d}..{hi:<8d} {R.size:7d} {gross:+9.1f} {R.mean():+11.4f} "
               f"{med:10.1f} {2.0/med:9.1%} {gross-cost_half:+9.1f} {gross-cost_one:+9.1f}")
+        if a.cluster_boot:
+            _cluster_boot(np.concatenate(allT), R, a.cluster_boot, kept)
         if cut is not None:
             for label, part in (("  pre", preR), (" post", postR)):
                 x = np.concatenate(part)
