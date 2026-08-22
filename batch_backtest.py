@@ -64,6 +64,17 @@ SIG_COLS = ["symbol", "entry_time", "dir", "entry", "stop0", "R_px", "kind",
 OUT_COLS = ["exit_time", "exit", "why", "R_realized", "ratcheted"]
 
 
+def num(x, sig=12):
+    """Format a float for the CSV without destroying precision.
+
+    The previous build wrote round(x, 4), which on an instrument priced near
+    0.0068 with a 1e-6 tick quantised the price grid to 100 ticks. Significant
+    figures, not decimal places: the same format works for Fed Funds at 99.5
+    and for the yen at 0.0068.
+    """
+    return f"{float(x):.{sig}g}"
+
+
 def iso(ts):
     return datetime.fromtimestamp(int(ts), timezone.utc).strftime("%Y-%m-%d %H:%M")
 
@@ -112,10 +123,10 @@ def write_trades(path, sym, trades, T):
         for tr in trades:
             entry, stop0 = tr["entry"], tr["stop0"]
             touches = len(tr["tch"]) if isinstance(tr.get("tch"), (list, tuple)) else tr.get("tch")
-            sig = [sym, iso(T[tr["t0"]]), tr["dir"], entry, stop0,
-                   round(abs(entry - stop0), 4), tr["kind"], touches,
+            sig = [sym, iso(T[tr["t0"]]), tr["dir"], num(entry), num(stop0),
+                   num(abs(entry - stop0)), tr["kind"], touches,
                    int(tr["t0"] - tr["a"]), iso(T[tr["a"]]), round(tr["m"], 8), tr["stop_src"]]
-            outc = [iso(T[tr["exit_idx"]]), tr["exit"], tr["why"], tr["R"],
+            outc = [iso(T[tr["exit_idx"]]), num(tr["exit"]), tr["why"], tr["R"],
                     int(bool(tr.get("ratcheted")))]
             w.writerow(sig + outc)
 
