@@ -8,3 +8,4 @@ tier_data/
 trade_review*.html
 live_state.json
 .DS_Store
+backtests/

@@ -1,0 +1,1 @@
+no .txt or .csv files in /path/to/DATA_DIR/. pass --data-dir to point at the price data, or drop seed/<SYM>.csv files in seed/.

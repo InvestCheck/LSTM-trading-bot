@@ -450,6 +450,36 @@ datetime string. Header optional. Use full-size ratio-adjusted continuous series
 - `tick_sanity.py` — stop distance in ticks, cost per bet, exclusion sensitivity.
 - `span_sweep.py` — span configs by gross edge and cost per bet.
 
-**Infrastructure**
-- `check_orders.py`, `DEPLOY.md`, `docker-compose.yml` — live/paper infra.
-- `results/` — datestamped scan output and frozen selection files.
+**Execution and infrastructure**
+- `live_ibkr.py` — IBKR bracket-order execution path, validated against the exit
+  engine. Never run live.
+- `sizing.py` — position sizing.
+- `trade_logger.py` — trade record persistence.
+- `check_orders.py` — order reconciliation.
+- `feature_schema.py` — feature/label column definitions for the tier model.
+- `example_usage.py` — minimal worked example.
+- `DEPLOY.md`, `docker-compose.yml`, `requirements.txt` — deployment.
+- `results/` — datestamped scan output and frozen selection files. **Read
+  `results/README.md` first**: the stage 1 holdout output in there is withdrawn,
+  and the 10 Aug notebook scan predates the rounding fix.
+
+## Attribution
+
+Research direction, strategy design, execution infrastructure and all decisions
+are mine. Anthropic's Claude was used substantially as a research assistant:
+writing analysis tooling (`stats_honest.py`, `holdout_stage2.py`,
+`tick_sanity.py`, `span_sweep.py`), auditing the backtest for bias, and drafting
+protocol and documentation text. Commit co-authorship reflects this and is left
+in place deliberately rather than scrubbed.
+
+Two things worth noting about that collaboration, because they bear on how much
+weight to give any single claim in this document. Several of the assistant's
+stated hypotheses were tested and **rejected** by the data — that trade-level
+serial dependence was inflating the t-statistics (bootstrap says no), that
+dividing t by the cross-sectional sigma was the right multiplicity correction
+(the calibration evidence says empirical Bayes shrinkage is), and that longer
+span floors would lower per-trade edge (it rises). Each is recorded above or in
+the protocols rather than quietly dropped. And one methodological error was made
+and caught: an early random-entry control was run on instruments already selected
+for performance, producing an inflated z = 6.3 that is flagged as uncitable in
+the main text.

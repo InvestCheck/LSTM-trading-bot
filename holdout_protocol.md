@@ -1,3 +1,39 @@
+> ## WITHDRAWN — 22 Aug 2026
+>
+> **This protocol ran exactly as registered, and its results are void anyway.**
+> Two independent problems, either of which is sufficient on its own.
+>
+> **1. The data was defective.** The trades were generated before a price
+> rounding defect in `backtest_hull.py` was found (bias source 4 in the main
+> README). `entry` and `stop` were stored as `round(x, 4)` and read back by the
+> exit engine, quantising the price grid to 100 ticks on instruments priced near
+> 0.0068. J7 and J1 — the two instruments this protocol reports as PASS — are
+> exactly the two the defect corrupted. J7 fell from +342.4R to +82.7R once
+> fixed, so its headline was 76% artifact.
+>
+> **2. The selection was contaminated.** The four instruments were chosen
+> because their *full-sample* t exceeded 3, and the full sample contains the
+> post-2020 holdout. The share of the selection statistic that is literally the
+> holdout is `sqrt(n_post / n_full)`: 0.62 for J7, 0.61 for J1. Roughly 60% of
+> the evidence that selected them was the data used to confirm them. The
+> "Honest caveat" section below anticipated this in general terms but
+> substantially understated the magnitude.
+>
+> On pre-2020 data alone — what a trader standing on 2020-01-01 would have had —
+> J1 (t 2.36) and ZR (t 3.06) would never have entered the survivor set at all.
+>
+> The successor is `holdout_protocol_stage2.md`, which runs the selection on
+> pre-cutoff data first and freezes the surviving list before scoring. It
+> selected nothing.
+>
+> The associated result files in `results/` are withdrawn and must not be cited.
+> Both this document and those files are kept rather than deleted so the
+> correction is auditable. **Everything below this block is unchanged from its
+> original commit** and can be verified with
+> `git show <original-hash>:holdout_protocol.md`.
+
+---
+
 # Holdout protocol — trendline-walk survivors
 
 **This document must be committed before `holdout_test.py` is run for the first
