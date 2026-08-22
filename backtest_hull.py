@@ -206,7 +206,7 @@ def run(name,path,mult,start_ts,tol=0.0015,toltouch=0.0010,touch_band=0.0005,brk
                 if pos['R']:                                 # entry + exit slippage, in R
                     if slip_ticks and tick: rr-=(2.0*slip_ticks*tick)/pos['R']
                     if slip_frac:           rr-=(2.0*slip_frac*pos['entry'])/pos['R']
-                pos.update(exit_idx=int(t),exit=round(float(ex),4),R=round(rr,3),why=why,stop_final=round(float(pos['stop']),4),ratcheted=bool(abs(pos['stop']-pos['stop0'])>1e-6)); trades.append(pos); pos=None
+                pos.update(exit_idx=int(t),exit=float(ex),R=round(rr,6),why=why,stop_final=float(pos['stop']),ratcheted=bool(abs(pos['stop']-pos['stop0'])>1e-6)); trades.append(pos); pos=None
             else:
                 if pos['phase']==1:
                     if d>0 and e200[t]<C[t] and e200[t]>pos['stop'] and abs(e200[t]-pos['entry'])>=0.5*pos['R']: pos['stop']=e200[t]
@@ -249,8 +249,8 @@ def run(name,path,mult,start_ts,tol=0.0015,toltouch=0.0010,touch_band=0.0005,brk
             else: continue
             Rd=stop-entry
             if Rd<=0: continue
-            sig=dict(dir=-1,entry=round(float(entry),4),stop=round(float(stop),4),R=Rd,phase=1,t0=int(t),
-                     a=int(a2),ya=round(float(L[a2]),4),m=float(m2),last=int(last2),kind='sup',tch=tch,stop0=round(float(stop),4),saf=saf,stop_src=stop_src); traded.add((a,b,'s')); break
+            sig=dict(dir=-1,entry=float(entry),stop=float(stop),R=Rd,phase=1,t0=int(t),
+                     a=int(a2),ya=round(float(L[a2]),4),m=float(m2),last=int(last2),kind='sup',tch=tch,stop0=float(stop),saf=saf,stop_src=stop_src); traded.add((a,b,'s')); break
         if sig is None:
             for i in range(1,len(rh)):
                 a,b=rh[i-1],rh[i]
@@ -284,8 +284,8 @@ def run(name,path,mult,start_ts,tol=0.0015,toltouch=0.0010,touch_band=0.0005,brk
                 else: continue
                 Rd=entry-stop
                 if Rd<=0: continue
-                sig=dict(dir=1,entry=round(float(entry),4),stop=round(float(stop),4),R=Rd,phase=1,t0=int(t),
-                         a=int(a2),ya=round(float(H[a2]),4),m=float(m2),last=int(last2),kind='res',tch=tch,stop0=round(float(stop),4),saf=saf,stop_src=stop_src); traded.add((a,b,'r')); break
+                sig=dict(dir=1,entry=float(entry),stop=float(stop),R=Rd,phase=1,t0=int(t),
+                         a=int(a2),ya=round(float(H[a2]),4),m=float(m2),last=int(last2),kind='res',tch=tch,stop0=float(stop),saf=saf,stop_src=stop_src); traded.add((a,b,'r')); break
         if sig: pos=sig
 
     arr=np.array([x['R'] for x in trades]) if trades else np.array([])
