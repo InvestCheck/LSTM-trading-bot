@@ -169,3 +169,87 @@ so the record shows what was predicted and what happened.
 
 All stage 1 results, and the survivors table in the README, are computed on
 the defective data and are withdrawn.
+
+## Stage 3 (exploratory), registered 22 Aug 2026
+
+Hypothesis, held before this data was examined: the discretionary strategy this
+bot encodes is top-down, using structural trendlines months in length. The
+tested config admits lines of 7 to 50 days, which is not that strategy.
+
+Configs, fixed now: 168:1200 (reference), 720:4320, 2160:17520, 168:99999999.
+
+Success is gross avgR holding at or above +0.054R while cost/bet falls below
+5%. Total R is not the criterion; a config that raises total R by taking more
+trades has not helped.
+
+This is exploratory. The universe has already been used for selection, so no
+result here is confirmatory, and anything promising requires forward validation.
+## Stage 3 (exploratory): span sweep — record, 22 Aug 2026
+
+Recorded after the fact. This section is a record, not a pre registration, and
+nothing in it is confirmatory. It is written up because the alternative is
+leaving an undocumented parameter search in the repo.
+
+### What was registered before running
+
+Hypothesis, held before this data was examined: the discretionary strategy this
+bot encodes is top down, using structural trendlines months in length. The
+tested config admits lines of 7 to 50 days, which is not that strategy. Longer
+lines should sit further from price, giving a larger R, and cost per trade is
+`2 * tick / R`, so a larger R should lower the cost fraction.
+
+Configs fixed in advance: `168:1200` (reference), `720:4320`, `2160:17520`,
+`168:99999999`. Four configs is four tests.
+
+Success criterion as written: gross avgR holding at or above +0.054R while
+cost/bet falls below 5%.
+
+Stated prediction: gross avgR would fall with longer spans, because breaks on
+multi month structure are rarer and noisier.
+
+### What happened
+
+| span | trades | gross avgR | med ticks | cost/bet | net @1 tick |
+|---|---|---|---|---|---|
+| 168..1200 | 57,452 | +0.0635 | 63.0 | 3.2% | +757.1 |
+| 720..4320 | 30,802 | +0.0701 | 62.8 | 3.2% | +560.5 |
+| 2160..17520 | 19,426 | +0.0779 | 64.2 | 3.1% | +513.3 |
+| 168..unbounded | 88,022 | +0.0673 | 64.3 | 3.1% | +1,511.8 |
+
+Executable subset only: instruments where one tick round trip exceeds 10% of the
+median bet are excluded throughout, on the mechanical ground that a stop
+narrower than the round trip cost cannot be executed as designed.
+
+### Three things to record honestly
+
+**The success criterion was badly specified.** Cost/bet was already 3.2% at the
+reference config, so "falls below 5%" was true before the experiment began and
+could not discriminate between configs. The criterion that would have meant
+something is the one the data happened to answer: does gross avgR rise. This is
+a defect in the registration, not in the result.
+
+**The hypothesised mechanism does not exist.** Median stop distance is flat at
+63 to 64 ticks across every config. R is set by the ATR stop, not by how long
+the line took to form, so span does not change the cost fraction at all. The
+reasoning that motivated the test was wrong even though the direction of the
+conclusion held.
+
+**The stated prediction was wrong.** Gross avgR rose monotonically with the span
+floor rather than falling. Longer structure produces better signals, not larger
+ones.
+
+### Consequences
+
+The README claim that unbounded span is worse (−8,860R on 107,867 trades) is
+withdrawn. That figure was produced on the build carrying the price rounding
+defect and without excluding the contracts where cost exceeds the bet size.
+
+No config is promoted on the strength of this. All four numbers are full sample,
+on data already used for instrument selection, contamination analysis and
+everything else in this project. The monotonic pattern is more informative than
+any single config clearing a threshold, since a dose response across four points
+is harder to obtain by chance than one winner, but it is still exploratory.
+
+The configuration carried into the forward test is `2160:17520`, chosen for the
+highest gross avgR and because it matches the discretionary approach the bot is
+meant to encode. See `forward_test_protocol.md`.
