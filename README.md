@@ -89,6 +89,43 @@ Instruments with a high profit factor and very few trades — FDIV at PF 1.83 on
 trades, PRK at 1.73 on 10, KRW at 2.70 on 65 — are reported in the tables but are
 underpowered. None reaches t > 2.
 
+### Holdout status: stage 1 was contaminated
+
+The stage 1 holdout (`holdout_protocol.md`, run 22 Aug 2026) split each
+survivor's trades at 2020-01-01 and reported PASS for J7 and J1, MARGINAL for PA
+and ZR. **That test does not mean what it appears to mean.** The four symbols
+were selected on their *full-sample* t, and the full sample includes the
+post-2020 partition. The share of the selection statistic that is literally the
+holdout is `sqrt(n_post / n_full)`: 0.62 for J7, 0.61 for J1, 0.53 for PA, 0.45
+for ZR. Around 60% of the evidence that chose J7 and J1 was the data used to
+confirm them.
+
+On pre-2020 data alone, which is what a trader standing on 2020-01-01 would have
+had, the t-statistics were J7 3.95, PA 3.47, ZR 3.06, J1 2.36. Against the
+Bonferroni threshold for 131 tests (t > 3.55), **only J7 would have been
+selected at all.** J1 and ZR entered the survivor set only because the holdout
+period pulled their full-sample t across the line.
+
+Two further points from stage 1 that the verdict column obscures:
+
+- **PA and ZR are uninformative, not marginal.** Projecting the in-sample effect
+  onto the realised holdout counts gives an expected t of 2.11 for PA and 1.46
+  for ZR. ZR delivered 1.65, which is slightly *above* what a fully real edge
+  would produce at n = 63. It failed to demonstrate anything because it could
+  not have, either way.
+- **Trade frequency collapsed.** Post-2020 signal rates fell to 0.54x prior for
+  PA and 0.34x for ZR.
+
+The cross-instrument test is the strongest evidence here and it points the wrong
+way: RY at t +2.37 and PJY at −4.07 disagree with each other, while the non-yen
+FX controls E6, B6 and A6 are all mildly negative. A mechanism that produces
++2.37 on one yen cross and −4.07 on another is not a mechanism.
+
+Stage 2 (`holdout_protocol_stage2.md`, `holdout_stage2.py`) runs the selection
+on pre-2020 data first, freezes the surviving list to disk, and scores the
+holdout once. **Not yet run.** Nothing in the stage 1 tables should be described
+as out-of-sample validation until it is.
+
 ### What costs did to the previous headline
 
 | | no slippage | 1 tick round trip |
@@ -213,6 +250,15 @@ python3 run_backtest.py DATA_DIR/GC_*.txt --legacy
 
 # random-entry control (honest defaults)
 python3 random_entry_control.py DATA_DIR/GC_*.txt DATA_DIR/PL_*.txt --sims 500
+
+# stage 2 holdout: select on pre-2020 only, commit, then score once
+python3 holdout_stage2.py select
+python3 holdout_stage2.py score
+
+# diagnostics, run only after scoring
+python3 holdout_stage2.py bootstrap J7 --period post   # t without assuming independence
+python3 holdout_stage2.py dsr J7 --period post         # deflated Sharpe vs best of 131
+python3 holdout_stage2.py regime J7 --lookback 480     # trendline edge vs trend beta
 ```
 
 **On the monkey control:** it randomizes BOTH entry bar and direction, so a high
@@ -249,6 +295,10 @@ datetime string. Header optional. Use full-size ratio-adjusted continuous series
 - `resample_tf.py` — 1h to 4h (or any rule) resampler.
 - `run_backtest.py` / `batch_backtest.py` — CLI backtests.
 - `random_entry_control.py` — monkey control (honest defaults).
+- `holdout_protocol.md` / `holdout_protocol_stage2.md` — pre-registered tests.
+- `holdout_stage2.py` — selection freeze, holdout scoring, dependence and
+  search-size diagnostics.
+- `stats_honest.py` — block bootstrap, deflated Sharpe, Newey-West OLS.
 - `make_training_data.py` — tier-model training set (honest defaults).
 - `check_orders.py`, `DEPLOY.md`, `docker-compose.yml` — live/paper infra.
 - `results/` — datestamped scan output.

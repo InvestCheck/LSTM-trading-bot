@@ -35,9 +35,7 @@ MAXSPAN = 1200
 WARMUP_DAYS = 60
 
 # standard contract tick sizes, used only when --slip is set
-TICKS = {"MGC": 0.10, "GC": 0.10, "SI": 0.005, "SIL": 0.005, "HG": 0.0005,
-         "MHG": 0.0005, "PL": 0.10, "PA": 0.05, "CL": 0.01, "MCL": 0.01,
-         "NQ": 0.25, "MNQ": 0.25, "ES": 0.25, "MES": 0.25}
+from instruments import TICKS
 
 SIG_COLS = ["symbol", "entry_time", "dir", "entry", "stop0", "R_px", "kind",
             "touches", "span_bars", "anchor_time", "slope", "stop_src"]
