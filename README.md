@@ -12,12 +12,13 @@ threshold for 131 tests, returns an empty set. The four instruments an earlier
 build reported as survivors do not hold: two were an arithmetic defect, and two
 do not clear the threshold on data available before the holdout.
 
-**The pooled signal is nonetheless real, and roughly half the size of its own
-execution cost.** A random-entry control on instruments chosen without reference
-to performance gives z = 2.7. Gross of costs, the median t across 92 instruments
-is +1.31. On the executable subset the strategy is net positive at one tick
-round-trip slippage, but breakeven for the whole book sits at 1.03 ticks and
-commissions are not yet modelled.
+**The pooled signal is nonetheless real, and roughly a third of it survives
+execution costs.** A random-entry control on instruments chosen without
+reference to performance gives z = 2.7. At the best span config the pooled
+edge is gross avgR +0.078, falling to +0.026 after one tick round-trip
+slippage, with a dependence-adjusted t of **+2.68** across 19,426 trades.
+Commissions, partially modelled, take it to roughly +0.014 to +0.019 with a
+t near 1.4 to 1.9 — real, unproven, and not resolvable on this data.
 
 Those are different questions, and this project spent most of its life
 conflating them. Neither result is out of sample.
@@ -213,6 +214,20 @@ costs derived analytically, which is exact because the engine charges
 | 2160..17520 | 19,426 | **+0.0779** | 64.2 | 3.1% | +513.3 |
 | 168..unbounded | 88,022 | +0.0673 | 64.3 | 3.1% | +1,511.8 |
 
+Split at 2020-01-01, gross avgR in each half:
+
+| span | pre | post |
+|---|---|---|
+| 168..1200 | +0.0654 | +0.0607 |
+| 720..4320 | +0.0673 | +0.0743 |
+| 2160..17520 | +0.0801 | +0.0743 |
+| 168..unbounded | +0.0687 | +0.0652 |
+
+Every config, both halves, lands between +0.060 and +0.080. Nothing here looks
+like a single regime. This is **not** a holdout — post-2020 has been used for
+selection and contamination analysis throughout this project — and speaks only
+to stability, not validity.
+
 Median stop distance is flat at 63 to 64 ticks across every config. The
 hypothesis was that longer lines sit further from price and give bigger bets,
 lowering the cost fraction. **That mechanism does not exist.** R is set by the
@@ -227,6 +242,57 @@ thesis by a different route than the one proposed.
 excluded it is +1,512R net at one tick. Both the rounding defect and the
 ZQ-class contracts were driving that conclusion.
 
+### How significant is the pooled edge, honestly
+
+The naive pooled t at 2160:17520 is +10.63 gross. **That figure is inflated and
+should not be cited.** It treats all 19,426 trades as independent draws, but the
+strategy holds correlated positions across many instruments at once, so a month
+in which metals trended is one event expressed dozens of times.
+
+A cluster bootstrap resamples whole calendar blocks across all 103 instruments
+together, keeping simultaneous trades bound to each other:
+
+| blocks | count | gross t_adj | net@1 t_adj | net p |
+|---|---|---|---|---|
+| month | 218 | +8.06 | +2.75 | 0.0076 |
+| quarter | 73 | +7.84 | **+2.68** | 0.0060 |
+| year | 19 | +9.12 | +3.37 | 0.0016 |
+
+Cross-instrument correlation deflates the statistic by 1.07x to 1.36x, less than
+expected. The number that matters is the **weakest net figure, +2.68**, not the
+gross one and not the best block length.
+
+Two things pull it lower still. This config was chosen as the best of four on
+gross avgR, so correcting for four tests puts it near +2.2 (an overcorrection,
+since the four configs are correlated rather than independent, but the honest
+range is +2.2 to +2.7 rather than a clean +2.68). And commissions, below, take
+another large bite.
+
+### Commissions
+
+Not previously modelled anywhere. `commissions.py` carries verified tick values
+for 40 contracts and **raises rather than defaulting to zero** on the other 55 —
+a zero default is exactly what caused bias source 3.
+
+Commission as a share of a 64-tick bet, IBKR Tiered plus an estimated CME
+non-member exchange fee, across the 40 verified contracts: median 0.74%,
+mean 1.24%, worst 3.88%. Applied to net avgR of +0.0264:
+
+| universe assumption | net avgR | t_adj |
+|---|---|---|
+| median contract | +0.0190 | +1.93 |
+| mean contract | +0.0140 | +1.42 |
+| micro-heavy | −0.0126 | **−1.28** |
+
+**The composition of the traded universe decides the sign.** Full-size contracts
+barely notice (SI 0.3%, US and UB 0.2%, GC 0.7%). The micros are punitive: MNQ,
+M2K, MBT and MET all sit at 3.9%, more than half the gross edge on their own.
+
+Two inputs are still estimates. The $1.45/side exchange fee for standard CME
+contracts is load-bearing and comes from IBKR's collapsed fee tables rather than
+a statement. And 55 of 103 executable instruments — most of the Eurex and ICE
+book — have no verified tick value and are excluded from the figures above.
+
 ---
 
 ## What is and is not supported
@@ -237,7 +303,9 @@ Supported:
 - Serial dependence between trades is not inflating these statistics.
 - Longer span floors improve per-trade edge monotonically.
 - The pooled signal on the executable subset is positive net of one tick
-  round-trip slippage.
+  round-trip slippage, at a dependence-adjusted t of +2.68 (+2.2 after
+  correcting for having chosen the best of four span configs).
+- Gross per-trade edge is stable across a 2020 time split in every config.
 - The reported portfolio loss is driven by contracts where execution cost
   exceeds the bet size, not by the signal.
 
@@ -250,7 +318,11 @@ Not supported:
 - **Any claim about a metals cluster.** PA, PL, MGC, HG and GC ranking near the
   top is what correlated instruments do under the null.
 - **Any claim of out-of-sample validity.** Every number above is full-sample on
-  data used repeatedly for selection. The span result is explicitly exploratory.
+  data used repeatedly for selection. The span result is explicitly exploratory,
+  and the 2020 split shows stability rather than validity.
+- **Any claim that this is tradeable.** After commissions the expected net edge
+  is roughly +0.014 to +0.019R with a t near 1.4 to 1.9, and turns negative on a
+  micro-heavy universe. That is not a result to allocate against.
 
 ## Other findings
 
@@ -270,8 +342,11 @@ Not supported:
   sweep, and four rounds of defect hunting. The 2020-01-01 split in particular
   has been examined repeatedly. Forward data is the only data this project has
   not already spent. See `forward_test_protocol.md`.
-- **Commissions are not modelled anywhere.** At 3.1% slippage against a 7.8%
-  gross edge, commission is not a rounding error.
+- **Commissions are only partially modelled.** `commissions.py` covers 40 of 103
+  executable contracts; the rest, mostly Eurex and ICE, need tick values from
+  contract specs. The exchange-fee component is estimated, not taken from a
+  statement. Given commission moves the net t from +2.68 to somewhere near +1.4
+  to +1.9, this is the largest open item.
 - **No capacity analysis.** The size at which market impact erodes the edge is
   untested, as is the practicality of holding positions in ~90 contracts at once.
 - **Never run live.** There is a working IBKR bracket-order execution path,
@@ -339,6 +414,13 @@ python3 tick_sanity.py --portfolio
 # span sweep: gross edge and cost per bet, one pass per config
 python3 span_sweep.py --data-dir DATA_DIR
 python3 span_sweep.py --data-dir DATA_DIR --split-at 2020-01-01
+
+# pooled cluster bootstrap: t without assuming trades are independent across
+# instruments. Reports gross and net@1 across month/quarter/year blocks.
+python3 span_sweep.py --data-dir DATA_DIR --configs 2160:17520 --cluster-boot 5000
+
+# commission table: tick values, round-trip cost, share of a 64-tick bet
+python3 commissions.py
 ```
 
 `span_sweep.py` reports gross avgR, median ticks and cost per bet rather than
@@ -448,7 +530,10 @@ datetime string. Header optional. Use full-size ratio-adjusted continuous series
 - `stats_honest.py` — block bootstrap, deflated Sharpe, Newey-West OLS.
 - `random_entry_control.py` — monkey control (honest defaults).
 - `tick_sanity.py` — stop distance in ticks, cost per bet, exclusion sensitivity.
-- `span_sweep.py` — span configs by gross edge and cost per bet.
+- `span_sweep.py` — span configs by gross edge and cost per bet; pooled cluster
+  bootstrap across instruments.
+- `commissions.py` — tick values and all-in round-trip costs. Raises on
+  unverified symbols rather than defaulting to zero.
 
 **Execution and infrastructure**
 - `live_ibkr.py` — IBKR bracket-order execution path, validated against the exit
