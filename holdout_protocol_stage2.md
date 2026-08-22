@@ -153,3 +153,19 @@ holdout did not.*
 This annotation was added in the following commit; the protocol content is
 unchanged from the hash above, which is verifiable with
 `git show 884416c:holdout_protocol_stage2.md`.
+
+## Addendum, 22 Aug 2026 — trade data regenerated after registration
+
+After this protocol was committed, a defect was found in backtest_hull.py:
+entry and stop were stored as round(x, 4) and read back by the exit engine,
+quantising the price grid to 100 ticks on instruments priced near 0.0068.
+J7 and J1 were materially affected; J7 fell from +342.4R to +82.7R and J1
+from +224.3R to +98.6R. PA and ZR were unaffected.
+
+The selection procedure below is unchanged. The stated expectation that the
+threshold would select J7 alone was derived from the defective data and is
+expected to be wrong. That expectation is left in place rather than edited,
+so the record shows what was predicted and what happened.
+
+All stage 1 results, and the survivors table in the README, are computed on
+the defective data and are withdrawn.
