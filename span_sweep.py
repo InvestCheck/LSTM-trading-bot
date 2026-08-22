@@ -57,6 +57,10 @@ def main():
                     default=["168:1200", "720:4320", "2160:17520", "168:99999999"])
     ap.add_argument("--symbols", nargs="*", default=None)
     ap.add_argument("--warmup-days", type=int, default=60)
+    ap.add_argument("--split-at", default=None,
+                    help="YYYY-MM-DD; report each config split into pre and post. "
+                         "Not a holdout: this data has already been used. It only "
+                         "shows whether the effect is stable in time.")
     ap.add_argument("--max-cost-frac", type=float, default=0.10,
                     help="exclude instruments where 1 tick round trip exceeds this "
                          "share of the median bet; they are unexecutable, not unprofitable")
@@ -74,8 +78,15 @@ def main():
     print(hdr)
     print("-" * len(hdr))
 
+    cut = None
+    if a.split_at:
+        from datetime import datetime, timezone
+        cut = datetime.strptime(a.split_at, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc).timestamp()
+
     for lo, hi in cfgs:
         allR, allticks, kept = [], [], 0
+        preR, postR = [], []
         for s in syms:
             tick = TICKS.get(s)
             if not tick:
@@ -100,6 +111,9 @@ def main():
                 continue          # unexecutable at any span, not a span question
             allR.append(R)
             allticks.append(rpx / tick)
+            if cut is not None:
+                ts = np.array([T[t["t0"]] for t in trades], float)[ok]
+                preR.append(R[ts < cut]); postR.append(R[ts >= cut])
             kept += 1
 
         if not allR:
@@ -114,6 +128,14 @@ def main():
         cost_one = float((2 * 1.0 / ticks).sum())
         print(f"{lo:>8d}..{hi:<8d} {R.size:7d} {gross:+9.1f} {R.mean():+11.4f} "
               f"{med:10.1f} {2.0/med:9.1%} {gross-cost_half:+9.1f} {gross-cost_one:+9.1f}")
+        if cut is not None:
+            for label, part in (("  pre", preR), (" post", postR)):
+                x = np.concatenate(part)
+                if x.size < 20:
+                    continue
+                t = x.mean() / (x.std(ddof=1) / np.sqrt(x.size))
+                print(f"{label:>18s} {x.size:7d} {x.sum():+9.1f} {x.mean():+11.4f} "
+                      f"{'':10s} {'':9s}   pooled t {t:+.2f}")
 
     print("-" * len(hdr))
     print(f"instruments where 1 tick exceeds {a.max_cost_frac:.0%} of the median bet are\n"
