@@ -242,8 +242,9 @@ retuning is curve fitting.
 # honest mode is the default
 python3 run_backtest.py DATA_DIR/GC_full_1hour_continuous_ratio_adjusted.txt
 
-# whole folder, with slippage
-python3 batch_backtest.py --slip 1
+# whole folder, with slippage. --data-dir reads the FirstRateData .txt files
+# directly, resolving symbols the same way the scan notebook does.
+python3 batch_backtest.py --data-dir DATA_DIR --slip 1
 
 # reproduce the old inflated numbers explicitly
 python3 run_backtest.py DATA_DIR/GC_*.txt --legacy

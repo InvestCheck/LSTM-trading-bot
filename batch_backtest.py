@@ -10,6 +10,9 @@ Usage:
   python3 batch_backtest.py --fill intrabar    fill model: one of {open, intrabar, next}
   python3 batch_backtest.py --no-causal        disable causal detection (default: causal on)
   python3 batch_backtest.py --legacy           inflated legacy mode (fill=open, causal=off)
+  python3 batch_backtest.py --data-dir DIR     read DIR instead of seed/ (FirstRateData
+                                               .txt files resolve to symbols the same way
+                                               the scan notebook does)
 
 Defaults are the published configuration: fill='intrabar', causal=True. --fill must be
 one of {open, intrabar, next}; any other value is a hard error. --legacy restores the old
@@ -25,7 +28,7 @@ Leakage rule: the trade CSV puts signal time columns first (known at entry) and 
 columns last (exit_time, exit, why, R_realized, ratcheted). Train the tier model ONLY on
 the signal time columns. Never feed an outcome column to the model.
 """
-import os, sys, glob, csv
+import os, re, sys, glob, csv
 from datetime import datetime, timezone
 from backtest_hull import run, load_series
 
@@ -34,8 +37,27 @@ OUT_DIR = "backtests"
 MAXSPAN = 1200
 WARMUP_DAYS = 60
 
-# standard contract tick sizes, used only when --slip is set
+# Tick sizes come from instruments.py, which covers all 131 scanned symbols.
+# A symbol missing from that mapping gets zero slippage and is warned about.
 from instruments import TICKS
+
+
+def symbol_of(path):
+    """FirstRateData filename to symbol. Same rule as the scan notebook, so a
+    directory of A6_full_1hour_continuous_ratio_adjusted.txt files resolves to
+    the symbols used in instruments.py and the results CSVs."""
+    b = os.path.basename(path)
+    b = re.sub(r"_full_1hour.*$", "", b)
+    b = re.sub(r"\.(csv|txt)$", "", b)
+    b = re.sub(r"^\d+_", "", b)
+    return b
+
+
+def build_catalog(data_dir):
+    """symbol -> path for every .txt/.csv in data_dir."""
+    paths = sorted(glob.glob(os.path.join(data_dir, "*.txt")) +
+                   glob.glob(os.path.join(data_dir, "*.csv")))
+    return {symbol_of(p): p for p in paths}
 
 SIG_COLS = ["symbol", "entry_time", "dir", "entry", "stop0", "R_px", "kind",
             "touches", "span_bars", "anchor_time", "slope", "stop_src"]
@@ -52,6 +74,7 @@ VALID_FILL = ("open", "intrabar", "next")
 def parse_args(argv):
     syms, maxspan, warmup, slip, fill, causal = [], MAXSPAN, WARMUP_DAYS, 0, 'intrabar', True
     legacy = False
+    data_dir = SEED_DIR
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -68,6 +91,8 @@ def parse_args(argv):
                          f"got {fill!r}")
         elif a == "--no-causal":
             causal = False; i += 1
+        elif a == "--data-dir":
+            data_dir = argv[i + 1]; i += 2
         elif a == "--legacy":
             legacy = True; i += 1
         else:
@@ -77,7 +102,7 @@ def parse_args(argv):
         fill, causal = 'open', False
         print("WARNING: --legacy uses fill='open', causal=False. These numbers are "
               "inflated and are NOT the published result.", file=sys.stderr)
-    return syms, maxspan, warmup, slip, fill, causal
+    return syms, maxspan, warmup, slip, fill, causal, data_dir
 
 
 def write_trades(path, sym, trades, T):
@@ -96,26 +121,31 @@ def write_trades(path, sym, trades, T):
 
 
 def main():
-    syms, maxspan, warmup, slip, fill, causal = parse_args(sys.argv)
-    if not syms:
-        syms = sorted(os.path.splitext(os.path.basename(p))[0]
-                      for p in glob.glob(os.path.join(SEED_DIR, "*.csv")))
-    if not syms:
-        print(f"no CSVs in {SEED_DIR}/. drop seed/<SYM>.csv files there."); return
+    syms, maxspan, warmup, slip, fill, causal, data_dir = parse_args(sys.argv)
+    catalog = build_catalog(data_dir)
+    if not catalog:
+        print(f"no .txt or .csv files in {data_dir}/. pass --data-dir to point at "
+              f"the price data, or drop seed/<SYM>.csv files in {SEED_DIR}/.")
+        return
+    missing = [s for s in syms if s not in catalog]
+    if missing:
+        print(f"not found in {data_dir}/: {', '.join(missing)}")
+    syms = [s for s in syms if s in catalog] or sorted(catalog)
+    no_tick = [s for s in syms if s not in TICKS]
+    if slip and no_tick:
+        print(f"WARNING: no tick size for {len(no_tick)} symbol(s), they get ZERO "
+              f"slippage: {', '.join(no_tick)}\n", file=sys.stderr)
     os.makedirs(OUT_DIR, exist_ok=True)
 
     cost = f", slippage {slip} tick/side" if slip else ""
-    print(f"MAXSPAN {maxspan}, warmup {warmup}d, fill={fill}, causal={causal}{cost}, {len(syms)} symbol(s)\n")
+    print(f"MAXSPAN {maxspan}, warmup {warmup}d, fill={fill}, causal={causal}{cost}, "
+          f"{len(syms)} symbol(s) from {data_dir}/\n")
     header = f"{'symbol':8s} {'trades':>6s} {'win%':>5s} {'totalR':>8s} {'avgR':>6s} {'PF':>5s}  range"
     print(header); print("-" * len(header))
     port_R, port_tr = 0.0, 0
     for sym in syms:
-        path = os.path.join(SEED_DIR, f"{sym}.csv")
-        if not os.path.exists(path):
-            print(f"{sym:8s}  (missing {path})"); continue
+        path = catalog[sym]
         tick = TICKS.get(sym, 0.0)
-        if slip and tick == 0.0:
-            print(f"{sym:8s}  (no tick size known; add it to TICKS to model slippage)")
         T, O, H, L, C = load_series(path)
         start_ts = int(T.min()) + warmup * 86400
         summ, trades, _, _ = run(sym, path, 1.0, start_ts, CAP=1e12, MAXSPAN=maxspan,
