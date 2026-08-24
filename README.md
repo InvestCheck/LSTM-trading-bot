@@ -12,13 +12,15 @@ threshold for 131 tests, returns an empty set. The four instruments an earlier
 build reported as survivors do not hold: two were an arithmetic defect, and two
 do not clear the threshold on data available before the holdout.
 
-**The pooled signal is nonetheless real, and roughly a third of it survives
+**The pooled signal is nonetheless real, and about half of it survives
 execution costs.** A random-entry control on instruments chosen without
-reference to performance gives z = 2.7. At the best span config the pooled
-edge is gross avgR +0.078, falling to +0.026 after one tick round-trip
-slippage, with a dependence-adjusted t of **+2.68** across 19,426 trades.
-Commissions, partially modelled, take it to roughly +0.014 to +0.019 with a
-t near 1.4 to 1.9 — real, unproven, and not resolvable on this data.
+reference to performance gives z = 2.7. At the best span config, with a
+trade-level cost floor applied, the pooled edge is gross avgR +0.072, falling
+to **+0.040** after one tick round-trip slippage, with a dependence-adjusted
+**t of +4.00** across 16,796 trades. Commissions take it to roughly +0.025 to
++0.033, **t of about 2.5 to 3.0**. It is stable across a 2020 split and does
+not depend on any single instrument. It is also entirely full-sample and has
+never been traded.
 
 Those are different questions, and this project spent most of its life
 conflating them. Neither result is out of sample.
@@ -242,6 +244,80 @@ thesis by a different route than the one proposed.
 excluded it is +1,512R net at one tick. Both the rounding defect and the
 ZQ-class contracts were driving that conclusion.
 
+### A trade-level cost floor, and what it is worth
+
+The 10% cost rule that excludes whole instruments (`2 ticks / median R > 0.10`)
+had never been applied to individual trades. Within any instrument, stop width
+varies, so cost varies: a 25-tick stop pays 8% of the bet, a 128-tick stop pays
+1.6%. Bucketing by stop width (`stop_width.py`):
+
+| stop (ticks) | share | cost/bet | gross avgR | net avgR |
+|---|---|---|---|---|
+| 0–20 | 13.4% | 17.5% | **+0.1173** | **−0.0578** |
+| 20–32 | 12.9% | 7.9% | +0.1124 | +0.0337 |
+| 32–48 | 13.6% | 5.1% | +0.0891 | +0.0379 |
+| 48–64 | 10.0% | 3.6% | +0.1006 | +0.0642 |
+| 64–96 | 13.7% | 2.6% | +0.0693 | +0.0435 |
+| 96–128 | 8.5% | 1.8% | +0.0515 | +0.0332 |
+| 128+ | 27.9% | 0.8% | +0.0416 | +0.0341 |
+
+Gross avgR is **not** flat: tight stops near structure carry the most edge per
+unit of risk. But the narrowest bucket has the best gross edge in the sample and
+still loses money, because it pays 17.5% per bet.
+
+A 20-tick floor is `2/20`, which is the same 10% rule applied one level down.
+It keeps 87% of trades and moves the result substantially:
+
+| | no floor | 20-tick floor |
+|---|---|---|
+| trades | 19,426 | 16,796 |
+| gross avgR | +0.0779 | +0.0719 |
+| median stop | 64 ticks | 78 ticks |
+| net avgR @ 1 tick | +0.0264 | **+0.0396** |
+| t_adj (weakest block) | +2.68 | **+4.00** |
+
+The floor helps twice: it drops the trades that cannot pay their own cost, and
+the surviving median bet is wider, which also lowers commission per trade.
+
+**An honesty note on the floor.** The 10% criterion predates this test, and the
+execution argument is independent of PnL: a stop narrower than the round-trip
+cost cannot be filled as designed. But the decision to apply it at trade level
+was made *after* seeing that the 0–20 bucket was net negative. Information
+flowed from the data to the choice. That makes this a mechanically justified
+rule applied after observing that it helps, which is weaker than a
+pre-registered one, and it is described that way deliberately.
+
+Raising the floor further does not help. At 48 ticks net avgR is +0.0411 against
++0.0395, but the sample drops 30% and t falls to +4.88 naive. There is also no
+principled justification above 20 — choosing 48 because it maximises avgR would
+be fitting.
+
+### The edge is broad, not a few instruments
+
+A pooled t says nothing about distribution. Leave-one-out across all 102
+instruments (`jackknife.py`, 2,000 resamples):
+
+- full book **t_adj +4.06**
+- worst single exclusion: without CNH, **+3.77**
+- best single exclusion: without AD, +4.40
+- 63 of 102 instruments positive, against ~51 expected under a null
+
+No instrument is load-bearing. Top contributor E7 is 9.8% of net R and the top
+ten are 64%, across 102 names.
+
+The same tool reports a drop-the-top-k column, which falls to +1.67 at k=10 and
+zero at k=20. **That column is biased and should not be read as fragility.** It
+selects on outcome, so it removes lucky draws along with real ones; a genuinely
+broad edge collapses under it mechanically. Leave-one-out is the informative
+view.
+
+### Stability across time
+
+With the floor applied, split at 2020-01-01: gross avgR **+0.0712 pre** and
+**+0.0729 post**, on 10,353 and 6,443 trades. The floor did not select a regime.
+This is a stability check, not a holdout — post-2020 has been used throughout
+this project.
+
 ### How significant is the pooled edge, honestly
 
 The naive pooled t at 2160:17520 is +10.63 gross. **That figure is inflated and
@@ -274,24 +350,46 @@ Not previously modelled anywhere. `commissions.py` carries verified tick values
 for 40 contracts and **raises rather than defaulting to zero** on the other 55 —
 a zero default is exactly what caused bias source 3.
 
-Commission as a share of a 64-tick bet, IBKR Tiered plus an estimated CME
-non-member exchange fee, across the 40 verified contracts: median 0.74%,
-mean 1.24%, worst 3.88%. Applied to net avgR of +0.0264:
+With the 20-tick floor the median bet is 78 ticks, so commission falls too.
+Across the 40 verified contracts: median **0.61%**, mean 1.02%, worst 3.18%.
+Applied to net avgR of +0.0396:
 
 | universe assumption | net avgR | t_adj |
 |---|---|---|
-| median contract | +0.0190 | +1.93 |
-| mean contract | +0.0140 | +1.42 |
-| micro-heavy | −0.0126 | **−1.28** |
+| median contract | +0.0335 | **+3.38** |
+| mean contract | +0.0294 | +2.97 |
+| micro-heavy | +0.0078 | +0.79 |
 
-**The composition of the traded universe decides the sign.** Full-size contracts
-barely notice (SI 0.3%, US and UB 0.2%, GC 0.7%). The micros are punitive: MNQ,
-M2K, MBT and MET all sit at 3.9%, more than half the gross edge on their own.
+Correcting for having chosen the best of four span configs takes +4.00 to
+roughly +3.5, and the micro-heavy case is no longer negative.
 
-Two inputs are still estimates. The $1.45/side exchange fee for standard CME
-contracts is load-bearing and comes from IBKR's collapsed fee tables rather than
-a statement. And 55 of 103 executable instruments — most of the Eurex and ICE
-book — have no verified tick value and are excluded from the figures above.
+**Sensitivity to the unverified contracts.** 64 of 102 executable symbols, and
+54.4% of trades, have no verified tick value. Rather than guess them,
+`commission_sensitivity.py` applies exact commissions to the verified 38 and
+sweeps an assumed rate across the rest:
+
+| assumed cost on unverified | net avgR | net total | t_adj |
+|---|---|---|---|
+| verified median 0.61% | +0.0314 | +527.6 | +3.18 |
+| verified mean 1.02% | +0.0284 | +476.9 | +2.87 |
+| 2.00% | +0.0212 | +355.7 | +2.14 |
+| verified worst 3.18% | +0.0125 | +209.7 | +1.26 |
+| 5.00% | −0.0009 | −15.4 | −0.09 |
+
+**Breakeven is 4.88%** — worse than any contract in the verified set. The
+unverified names are overwhelmingly full-size CME FX (DX, E1, RP, RY, J1, AD,
+J7, CNH), Eurex bonds and index (FGBL, FGBX, FBTP, FOAT, FDAX, FESX) and ICE
+softs (G, CT, BZ), which are the cheap end. Almost none are micros. The
+plausible band is therefore **t_adj +2.1 to +3.2**, centred near +2.9.
+
+The distribution is flat: it takes 38 symbols to cover 85% of unverified
+trades, so there is no small set of lookups that resolves this.
+
+Two inputs remain estimates. The **$1.45/side exchange fee** for standard CME
+contracts is the load-bearing one — it sits under all 103 contracts including
+the 38 already verified — and comes from IBKR's collapsed fee tables rather than
+an account statement. And the 64 unverified tick values, which the sensitivity
+above shows cannot flip the sign but do set the width of the band.
 
 ---
 
@@ -303,9 +401,17 @@ Supported:
 - Serial dependence between trades is not inflating these statistics.
 - Longer span floors improve per-trade edge monotonically.
 - The pooled signal on the executable subset is positive net of one tick
-  round-trip slippage, at a dependence-adjusted t of +2.68 (+2.2 after
-  correcting for having chosen the best of four span configs).
-- Gross per-trade edge is stable across a 2020 time split in every config.
+  round-trip slippage, at a dependence-adjusted t of +4.00 with a trade-level
+  cost floor, roughly +3.5 after correcting for four span configs.
+- After commissions the plausible band is t_adj +2.1 to +3.2.
+- The edge is broad: leave-one-out across 102 instruments never falls below
+  +3.77, and 63 of 102 instruments are positive.
+- Gross per-trade edge is stable across a 2020 time split in every config, with
+  and without the floor.
+- Trade outcome shows no exploitable structure in signal-time features. On PA,
+  the best of 2,000 random filters improved net avgR by +0.26 with no
+  information at all (`filter_control.py`); any fitted filter must clear that
+  bar, and none has.
 - The reported portfolio loss is driven by contracts where execution cost
   exceeds the bet size, not by the signal.
 
@@ -320,9 +426,12 @@ Not supported:
 - **Any claim of out-of-sample validity.** Every number above is full-sample on
   data used repeatedly for selection. The span result is explicitly exploratory,
   and the 2020 split shows stability rather than validity.
-- **Any claim that this is tradeable.** After commissions the expected net edge
-  is roughly +0.014 to +0.019R with a t near 1.4 to 1.9, and turns negative on a
-  micro-heavy universe. That is not a result to allocate against.
+- **Any claim that this is tradeable.** The result has never been traded, the
+  execution path has never been run live, and the exchange-fee component of the
+  cost model is an estimate rather than a measurement.
+- **Any per-instrument or per-setup filter.** A random-filter control shows the
+  search space is large enough that fitted filters are indistinguishable from
+  noise on this data, and no clean holdout remains to check one against.
 
 ## Other findings
 
@@ -343,10 +452,13 @@ Not supported:
   has been examined repeatedly. Forward data is the only data this project has
   not already spent. See `forward_test_protocol.md`.
 - **Commissions are only partially modelled.** `commissions.py` covers 40 of 103
-  executable contracts; the rest, mostly Eurex and ICE, need tick values from
-  contract specs. The exchange-fee component is estimated, not taken from a
-  statement. Given commission moves the net t from +2.68 to somewhere near +1.4
-  to +1.9, this is the largest open item.
+  executable contracts. The sensitivity analysis shows the remainder cannot flip
+  the sign (breakeven 4.88% against a worst verified contract of 3.18%) but does
+  set the width of the band. The **exchange-fee estimate is the larger open
+  item**, since it applies to every contract including the verified ones, and is
+  settled cheaply from an account statement rather than a spec table.
+- **The trade-level cost floor was applied after observing that it helps.**
+  Mechanically justified, not pre-registered. See the note in the span section.
 - **No capacity analysis.** The size at which market impact erodes the edge is
   untested, as is the practicality of holding positions in ~90 contracts at once.
 - **Never run live.** There is a working IBKR bracket-order execution path,
@@ -414,6 +526,23 @@ python3 tick_sanity.py --portfolio
 # span sweep: gross edge and cost per bet, one pass per config
 python3 span_sweep.py --data-dir DATA_DIR
 python3 span_sweep.py --data-dir DATA_DIR --split-at 2020-01-01
+
+# trade-level cost floor. --min-ticks 20 is the 10% rule (2/20) applied to
+# individual trades. Mechanical, not tuned; do not raise it to chase total R.
+python3 span_sweep.py --data-dir DATA_DIR --min-ticks 20 --cluster-boot 5000
+
+# stop width vs edge: is the cost saving real, or is it trading edge for cost?
+python3 stop_width.py
+
+# is the edge broad or a few instruments? leave-one-out is the honest column
+python3 jackknife.py --min-ticks 20 --boot 2000
+
+# how bad would the unverified contracts have to be to kill the result?
+python3 commission_sensitivity.py --min-ticks 20 --boot 5000
+
+# the monkey control for filters: how much does a RANDOM filter improve things?
+python3 filter_control.py PA --sims 2000
+python3 filter_control.py PA --sims 2000 --my-filter "touches>=4,span_bars>=3000"
 
 # pooled cluster bootstrap: t without assuming trades are independent across
 # instruments. Reports gross and net@1 across month/quarter/year blocks.
@@ -530,10 +659,18 @@ datetime string. Header optional. Use full-size ratio-adjusted continuous series
 - `stats_honest.py` — block bootstrap, deflated Sharpe, Newey-West OLS.
 - `random_entry_control.py` — monkey control (honest defaults).
 - `tick_sanity.py` — stop distance in ticks, cost per bet, exclusion sensitivity.
-- `span_sweep.py` — span configs by gross edge and cost per bet; pooled cluster
-  bootstrap across instruments.
+- `span_sweep.py` — span configs by gross edge and cost per bet; trade-level
+  cost floor; pooled cluster bootstrap across instruments.
+- `stop_width.py` — edge and cost by stop width, and the cumulative effect of a
+  trade-level floor.
+- `jackknife.py` — leave-one-out and drop-the-top-k across instruments.
+- `filter_control.py` — random-filter control. Builds a null matched to your
+  filter's own retention rate, because a null at a different retention rate
+  flatters tight filters.
 - `commissions.py` — tick values and all-in round-trip costs. Raises on
   unverified symbols rather than defaulting to zero.
+- `commission_sensitivity.py` — sweeps an assumed cost across the unverified
+  contracts and reports the breakeven.
 
 **Execution and infrastructure**
 - `live_ibkr.py` — IBKR bracket-order execution path, validated against the exit

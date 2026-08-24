@@ -119,6 +119,12 @@ def main():
                     default=["168:1200", "720:4320", "2160:17520", "168:99999999"])
     ap.add_argument("--symbols", nargs="*", default=None)
     ap.add_argument("--warmup-days", type=int, default=60)
+    ap.add_argument("--min-ticks", type=float, default=0.0, metavar="N",
+                    help="drop individual trades whose stop is narrower than N "
+                         "ticks. N=20 is the 10%% cost rule (2/20) already used "
+                         "to exclude instruments, applied one level down. This "
+                         "is a mechanical execution criterion, NOT a fitted "
+                         "threshold -- do not tune it to maximise total R.")
     ap.add_argument("--cluster-boot", type=int, default=0, metavar="B",
                     help="B resamples of a calendar-block bootstrap over the POOLED "
                          "trade set. Resamples whole months across all instruments "
@@ -140,7 +146,10 @@ def main():
     syms = [s for s in (a.symbols or sorted(catalog)) if s in catalog]
     cfgs = [parse_cfg(c) for c in a.configs]
 
-    print(f"{len(syms)} symbols, {len(cfgs)} span configs, zero-slippage pass\n")
+    floor = (f", trade floor {a.min_ticks:.0f} ticks "
+             f"(cost <= {2/a.min_ticks:.1%} per bet)" if a.min_ticks > 0 else "")
+    print(f"{len(syms)} symbols, {len(cfgs)} span configs, zero-slippage pass"
+          f"{floor}\n")
     hdr = (f"{'span':>18s} {'trades':>7s} {'gross R':>9s} {'gross avgR':>11s} "
            f"{'med ticks':>10s} {'cost/bet':>9s} {'net @0.5':>9s} {'net @1':>9s}")
     print(hdr)
@@ -176,11 +185,17 @@ def main():
             if ok.sum() < 20:
                 continue
             R, rpx = R[ok], rpx[ok]
+            ts = np.array([T[t["t0"]] for t in trades], float)[ok]
             if 2 * tick / float(np.median(rpx)) > a.max_cost_frac:
                 continue          # unexecutable at any span, not a span question
+            tk = rpx / tick
+            if a.min_ticks > 0:   # trade-level version of the same cost rule
+                keep = tk >= a.min_ticks
+                if keep.sum() < 20:
+                    continue
+                R, tk, ts = R[keep], tk[keep], ts[keep]
             allR.append(R)
-            allticks.append(rpx / tick)
-            ts = np.array([T[t["t0"]] for t in trades], float)[ok]
+            allticks.append(tk)
             allT.append(ts)
             if cut is not None:
                 preR.append(R[ts < cut]); postR.append(R[ts >= cut])
