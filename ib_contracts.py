@@ -36,31 +36,31 @@ IB = {
     "A6":  _c("AUD", "CME"),
     "AD":  _c("CAD", "CME"),          # instruments.py calls AD the Canadian dollar
     "B6":  _c("GBP", "CME"),
-    "CNH": _c("CNH", "CME"),
+    "CNH": _c("CNH", "CME", "CNH"),      # USD/CNH is quoted in CNH
     "E1":  _c("CHF", "CME"),
     "E6":  _c("EUR", "CME"),
     "E7":  _c("E7",  "CME"),
     "J1":  _c("JPY", "CME"),
     "J7":  _c("J7",  "CME"),
-    "MP":  _c("MXP", "CME"),
+    "MP":  _c("6M",  "CME"),             # IBKR's MXP is Micro XRP; the peso is 6M
     "N6":  _c("NZD", "CME"),
     "NOK": _c("NOK", "CME"),
     "SEK": _c("SEK", "CME"),
-    "RP":  _c("RP",  "CME"),
-    "RY":  _c("RY",  "CME"),
+    "RP":  _c("RP",  "CME", "GBP"),      # EUR/GBP is quoted in GBP
+    "RY":  _c("RY",  "CME", "JPY"),      # EUR/JPY is quoted in JPY
     "SIR": _c("SIR", "CME"),
     # CME equity index
     "ES":  _c("ES",  "CME"),
     "NQ":  _c("NQ",  "CME"),
     "RTY": _c("RTY", "CME"),
     "EW":  _c("EMD", "CME"),
-    "NIY": _c("NIY", "CME", "JPY"),
-    "NKD": _c("NKD", "CME"),
+    "NIY": _c("NIY", "CME", "JPY", tradingClass="NIY"),   # symbol also lists the ENY mini
+    "NKD": _c("NKD", "CME", tradingClass="NKD"),
     # CME livestock and dairy
     "GF":  _c("GF",  "CME", months="FHJKQUVX"),
     "HE":  _c("HE",  "CME", months="GJKMNQVZ"),
     "LE":  _c("LE",  "CME", months="GJMQVZ", physical=True),
-    "DC":  _c("DC",  "CME", months=ALL),
+    "DC":  _c("DA",  "CME", months=ALL, tradingClass="DC"),   # Class III milk is symbol DA at IBKR
     # CBOT
     "YM":  _c("YM",  "CBOT"),
     "ZT":  _c("ZT",  "CBOT", physical=True),
@@ -69,7 +69,7 @@ IB = {
     "TN":  _c("TN",  "CBOT", physical=True),
     "UB":  _c("UB",  "CBOT", physical=True),
     "ZC":  _c("ZC",  "CBOT", months="HKNUZ", physical=True),
-    "XC":  _c("XC",  "CBOT", months="HKNUZ", physical=True),
+    "XC":  _c("YC",  "CBOT", months="HKNUZ", physical=True),   # CBOT mini corn is YC at IBKR
     "ZS":  _c("ZS",  "CBOT", months="FHKNQUX", physical=True),
     "ZL":  _c("ZL",  "CBOT", months="FHKNQUVZ", physical=True),
     "ZM":  _c("ZM",  "CBOT", months="FHKNQUVZ", physical=True),
@@ -85,7 +85,7 @@ IB = {
     # COMEX
     "GC":  _c("GC",  "COMEX", months="GJMQVZ", physical=True),
     "MGC": _c("MGC", "COMEX", months="GJMQVZ", physical=True),
-    "SI":  _c("SI",  "COMEX", months="HKNUZ", physical=True),
+    "SI":  _c("SI",  "COMEX", months="HKNUZ", physical=True, tradingClass="SI"),   # symbol SI also returns the SIL micro
     "HG":  _c("HG",  "COMEX", months="HKNUZ", physical=True),
     # ICE US (IBKR exchange code NYBOT)
     "CT":  _c("CT",  "NYBOT", months="HKNVZ", physical=True),
@@ -106,10 +106,10 @@ IB = {
     "FBTP": _c("BTP",    "EUREX", "EUR", tradingClass="FBTP"),
     "FBON": _c("BONO",   "EUREX", "EUR", tradingClass="FBON"),
     # Euronext and ICE Europe
-    "FCE":  _c("CAC40", "MONEP", "EUR", months=ALL),
-    "FTI":  _c("EOE",   "FTA",   "EUR", months=ALL),
+    "FCE":  _c("CAC40", "MONEP", "EUR", months=ALL, tradingClass="FCE"),   # symbol also lists the MFC mini
+    "FTI":  _c("EOE",   "FTA",   "EUR", months=ALL, tradingClass="FTI"),   # symbol also lists the MFA mini
     "FTUK": _c("Z",     "ICEEU", "GBP"),
-    "B":    _c("COIL",  "ICEEU", "USD", months=ALL),   # ICE Brent
+    "B":    _c("COIL",  "IPE",   "USD", months=ALL),   # ICE Brent lives on IBKR's IPE exchange code
     "G":    _c("R",     "ICEEU", "GBP", physical=True),
 }
 
@@ -142,10 +142,19 @@ def month_letter(contract_month):
     return "FGHJKMNQUVXZ"[int(contract_month[4:6]) - 1]
 
 
-def pick_active(details, spec, today):
-    """From reqContractDetails results, the contract the protocol trades today:
-    the earliest traded month whose roll date is still ahead. Returns
-    (ContractDetails, roll_date) or (None, None)."""
+def contract_rows(details, spec):
+    """reqContractDetails results -> [(last_trade, roll_date, ContractDetails)]
+    for the traded months only, sorted by last trade date."""
+    def mult(d):
+        try: return float(d.contract.multiplier)
+        except (TypeError, ValueError): return 0.0
+    if spec["tradingClass"]:
+        details = [d for d in details if d.contract.tradingClass == spec["tradingClass"]]
+    elif details:
+        # IBKR lists minis under the same symbol: keep the full size trading class
+        best = max({d.contract.tradingClass for d in details},
+                   key=lambda tc: max(mult(d) for d in details if d.contract.tradingClass == tc))
+        details = [d for d in details if d.contract.tradingClass == best]
     rows = []
     for d in details:
         cm = (d.contractMonth or d.contract.lastTradeDateOrContractMonth)[:6]
@@ -155,10 +164,15 @@ def pick_active(details, spec, today):
         if len(ltd_s) < 8:
             continue
         ltd = date(int(ltd_s[:4]), int(ltd_s[4:6]), int(ltd_s[6:8]))
-        rd = roll_date(ltd, cm, spec["physical"])
-        if rd > today:
-            rows.append((ltd, rd, d))
-    if not rows:
-        return None, None
+        rows.append((ltd, roll_date(ltd, cm, spec["physical"]), d))
     rows.sort(key=lambda r: r[0])
-    return rows[0][2], rows[0][1]
+    return rows
+
+
+def pick_active(details, spec, today):
+    """The contract the protocol trades today: the earliest traded month whose
+    roll date is still ahead. Returns (ContractDetails, roll_date) or (None, None)."""
+    for ltd, rd, d in contract_rows(details, spec):
+        if rd > today:
+            return d, rd
+    return None, None

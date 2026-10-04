@@ -1,0 +1,26 @@
+{
+ "conId": 597391703,
+ "local": "ZSX6",
+ "exchange": "CBOT",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-10-23",
+ "vendor_end": "2026-09-08 14:00",
+ "splice": [
+  {
+   "contract": "ZSU6",
+   "ratio": 0.9913344887348353,
+   "overlap": 61,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "ZSX6",
+   "ratio": 1.0087412587412588,
+   "overlap": 72,
+   "off": 0.0,
+   "bars": 342
+  }
+ ],
+ "rolls": []
+}

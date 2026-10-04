@@ -1,0 +1,28 @@
+{
+ "conId": 738362105,
+ "local": "DCV6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [
+  "DCQ6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-27",
+ "vendor_end": "2026-09-08 16:00",
+ "splice": [
+  {
+   "contract": "DCU6",
+   "ratio": 0.9630732578916023,
+   "overlap": 31,
+   "off": 0.0,
+   "bars": 155
+  },
+  {
+   "contract": "DCV6",
+   "ratio": 0.9795539033457249,
+   "overlap": 75,
+   "off": 0.12,
+   "bars": 174
+  }
+ ],
+ "rolls": []
+}

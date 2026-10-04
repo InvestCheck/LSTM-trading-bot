@@ -1,0 +1,26 @@
+{
+ "conId": 459557845,
+ "local": "NKDZ6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-12-03",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "NKDU6",
+   "ratio": 1.0006165743870663,
+   "overlap": 107,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "NKDZ6",
+   "ratio": 0.9993838055426535,
+   "overlap": 104,
+   "off": 0.0,
+   "bars": 413
+  }
+ ],
+ "rolls": []
+}

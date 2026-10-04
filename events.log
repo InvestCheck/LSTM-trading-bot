@@ -1,0 +1,100 @@
+2026-10-04T21:56:00+00:00 connected to IBKR ['DUQ848536'] on 4002 (shadow)
+2026-10-04T21:56:00+00:00 forward test runner: shadow mode, 70 symbols, data from /Users/ajair/Desktop/data_archive/DATA_DIR
+2026-10-04T21:56:03+00:00 data_splice  A6    contract=6AZ6 bar_time=2026-10-02 16:00 note=6AU6 x1 (115 ovl, 0% off, 0 bars) -> 6AZ6 x0.99841 (115 ovl, 0% off, 413 bars)
+2026-10-04T21:56:05+00:00 [ib] error 162 req 416: Historical Market Data Service error message:HMDS query returned no data: 6CM6@CME Trades
+2026-10-04T21:56:08+00:00 data_splice  AD    contract=6CZ6 bar_time=2026-10-02 16:00 note=6CU6 x1 (115 ovl, 0% off, 5 bars) -> 6CZ6 x1.0042 (115 ovl, 0% off, 408 bars); skipped 6CM6 (0 ovl, 0 after)
+2026-10-04T21:56:10+00:00 missed       AD    contract=6CZ6 dir=-1 bar_time=2026-10-02 12:00 engine_px=0.7037658787 note=open at bot start
+2026-10-04T21:56:15+00:00 data_splice  B     contract=COILZ6 bar_time=2026-10-02 17:00 note=COILX6 x1 (108 ovl, 0% off, 250 bars) -> COILZ6 x0.95854 (112 ovl, 0% off, 152 bars); skipped COILV6 (0 ovl, 0 after)
+2026-10-04T21:56:26+00:00 data_splice  B6    contract=6BZ6 bar_time=2026-10-02 16:00 note=6BU6 x1 (115 ovl, 0% off, 0 bars) -> 6BZ6 x1.0001 (115 ovl, 0% off, 413 bars)
+2026-10-04T21:57:02+00:00 data_splice  BZ    contract=BZZ6 bar_time=2026-10-02 16:00 note=BZX6 x1 (113 ovl, 0% off, 258 bars) -> BZZ6 x0.95849 (115 ovl, 0% off, 155 bars); skipped BZV6 (0 ovl, 0 after)
+2026-10-04T21:57:04+00:00 [ib] error 162 req 435: Historical Market Data Service error message:HMDS query returned no data: CLU6@NYMEX Trades
+2026-10-04T21:57:07+00:00 data_splice  CL    contract=CLX6 bar_time=2026-10-02 16:00 note=CLV6 x1 (113 ovl, 0% off, 120 bars) -> CLX6 x0.9579 (115 ovl, 7% off, 293 bars); skipped CLU6 (0 ovl, 0 after)
+2026-10-04T21:57:10+00:00 data_splice  CNH   contract=CNHZ6 bar_time=2026-10-02 16:00 note=CNHU6 x1 (101 ovl, 0% off, 0 bars) -> CNHZ6 x0.99366 (84 ovl, 0% off, 386 bars)
+2026-10-04T21:57:11+00:00 [ib] error 162 req 444: Historical Market Data Service error message:HMDS query returned no data: CTN6@NYBOT Trades
+2026-10-04T21:57:15+00:00 data_splice  CT    contract=CTZ6 bar_time=2026-10-02 14:00 note=CTV6 x1 (34 ovl, 0% off, 142 bars) -> CTZ6 x1.0463 (55 ovl, 36% off, 126 bars); skipped CTN6 (0 ovl, 0 after)
+2026-10-04T21:57:26+00:00 data_splice  DC    contract=DCV6 bar_time=2026-10-02 14:00 note=DCU6 x0.96307 (31 ovl, 0% off, 155 bars) -> DCV6 x0.97955 (75 ovl, 12% off, 174 bars); skipped DCQ6 (0 ovl, 0 after)
+2026-10-04T21:57:38+00:00 data_splice  DX    contract=DXZ6 bar_time=2026-10-02 16:00 note=DXU6 x1 (107 ovl, 0% off, 0 bars) -> DXZ6 x0.99747 (103 ovl, 0% off, 384 bars)
+2026-10-04T21:58:02+00:00 data_splice  E1    contract=6SZ6 bar_time=2026-10-02 16:00 note=6SU6 x1 (115 ovl, 0% off, 0 bars) -> 6SZ6 x1.0103 (115 ovl, 0% off, 413 bars)
+2026-10-04T21:58:06+00:00 data_splice  E6    contract=6EZ6 bar_time=2026-10-02 16:00 note=6EU6 x1 (115 ovl, 0% off, 0 bars) -> 6EZ6 x1.0035 (115 ovl, 0% off, 413 bars)
+2026-10-04T21:58:10+00:00 data_splice  E7    contract=E7Z6 bar_time=2026-10-02 16:00 note=E7U6 x1 (115 ovl, 0% off, 0 bars) -> E7Z6 x1.0035 (114 ovl, 0% off, 413 bars)
+2026-10-04T21:58:12+00:00 [ib] error 162 req 470: Historical Market Data Service error message:HMDS query returned no data: ESM6@CME Trades
+2026-10-04T21:58:15+00:00 data_splice  ES    contract=ESZ6 bar_time=2026-10-02 16:00 note=ESU6 x1 (111 ovl, 0% off, 68 bars) -> ESZ6 x1.0087 (111 ovl, 0% off, 345 bars); skipped ESM6 (0 ovl, 0 after)
+2026-10-04T21:58:20+00:00 [ib] error 162 req 475: Historical Market Data Service error message:HMDS query returned no data: EMDM6@CME Trades
+2026-10-04T21:58:32+00:00 data_splice  EW    contract=EMDZ6 bar_time=2026-10-02 16:00 note=EMDU6 x1 (110 ovl, 0% off, 68 bars) -> EMDZ6 x1.0078 (59 ovl, 0% off, 341 bars); skipped EMDM6 (0 ovl, 0 after)
+2026-10-04T21:58:36+00:00 data_splice  FBON  contract=FBON 20261208 M bar_time=2026-10-02 12:00 note=FBON 20260908 M x1.0031 (21 ovl, 0% off, 0 bars) -> FBON 20261208 M x0.99768 (24 ovl, 0% off, 186 bars)
+2026-10-04T21:58:38+00:00 data_splice  FBTP  contract=FBTP 20261208 M bar_time=2026-10-02 12:00 note=FBTP 20260908 M x1.0068 (55 ovl, 0% off, 0 bars) -> FBTP 20261208 M x0.99322 (55 ovl, 0% off, 198 bars)
+2026-10-04T21:58:39+00:00 [ib] error 162 req 488: Historical Market Data Service error message:HMDS query returned no data: FCEQ6@MONEP Trades
+2026-10-04T21:58:42+00:00 data_splice  FCE   contract=FCEV6 bar_time=2026-10-02 15:00 note=FCEU6 x1 (70 ovl, 0% off, 42 bars) -> FCEV6 x0.99918 (58 ovl, 0% off, 210 bars); skipped FCEQ6 (0 ovl, 0 after)
+2026-10-04T21:58:43+00:00 [ib] error 162 req 493: Historical Market Data Service error message:HMDS query returned no data: FDAX 20260619 M@EUREX Trades
+2026-10-04T21:58:46+00:00 data_splice  FDAX  contract=FDAX 20261218 M bar_time=2026-10-02 16:00 note=FDAX 20260918 M x1 (100 ovl, 0% off, 63 bars) -> FDAX 20261218 M x1.007 (78 ovl, 0% off, 311 bars); skipped FDAX 20260619 M (0 ovl, 0 after)
+2026-10-04T21:58:48+00:00 [ib] error 162 req 498: Historical Market Data Service error message:HMDS query returned no data: FDXM 20260619 M@EUREX Trades
+2026-10-04T21:58:50+00:00 data_splice  FDXM  contract=FDXM 20261218 M bar_time=2026-10-02 16:00 note=FDXM 20260918 M x1 (100 ovl, 0% off, 63 bars) -> FDXM 20261218 M x1.0069 (86 ovl, 0% off, 315 bars); skipped FDXM 20260619 M (0 ovl, 0 after)
+2026-10-04T21:58:52+00:00 [ib] error 162 req 503: Historical Market Data Service error message:HMDS query returned no data: FESX 20260619 M@EUREX Trades
+2026-10-04T21:58:55+00:00 data_splice  FESX  contract=FESX 20261218 M bar_time=2026-10-02 16:00 note=FESX 20260918 M x1 (100 ovl, 0% off, 63 bars) -> FESX 20261218 M x1.0032 (103 ovl, 0% off, 315 bars); skipped FESX 20260619 M (0 ovl, 0 after)
+2026-10-04T21:59:05+00:00 data_splice  FGBL  contract=FGBL 20261208 M bar_time=2026-10-02 16:00 note=FGBL 20260908 M x1.0069 (99 ovl, 0% off, 0 bars) -> FGBL 20261208 M x0.99315 (100 ovl, 0% off, 378 bars)
+2026-10-04T21:59:23+00:00 data_splice  FGBM  contract=FGBM 20261208 M bar_time=2026-10-02 16:00 note=FGBM 20260908 M x0.99762 (93 ovl, 0% off, 0 bars) -> FGBM 20261208 M x1.0024 (98 ovl, 0% off, 378 bars)
+2026-10-04T21:59:36+00:00 data_splice  FGBX  contract=FGBX 20261208 M bar_time=2026-10-02 16:00 note=FGBX 20260908 M x1.006 (91 ovl, 0% off, 0 bars) -> FGBX 20261208 M x0.99399 (96 ovl, 0% off, 379 bars)
+2026-10-04T21:59:39+00:00 data_splice  FOAT  contract=FOAT 20261208 M bar_time=2026-10-02 16:00 note=FOAT 20260908 M x1.0065 (89 ovl, 0% off, 0 bars) -> FOAT 20261208 M x0.99357 (95 ovl, 0% off, 379 bars)
+2026-10-04T21:59:40+00:00 [ib] error 162 req 524: Historical Market Data Service error message:HMDS query returned no data: FTIQ6@FTA Trades
+2026-10-04T21:59:43+00:00 data_splice  FTI   contract=FTIV6 bar_time=2026-10-02 15:00 note=FTIU6 x1 (70 ovl, 0% off, 42 bars) -> FTIV6 x1.0027 (51 ovl, 0% off, 210 bars); skipped FTIQ6 (0 ovl, 0 after)
+2026-10-04T21:59:44+00:00 [ib] error 162 req 529: Historical Market Data Service error message:HMDS query returned no data: ZM6@ICEEU Trades
+2026-10-04T21:59:47+00:00 data_splice  FTUK  contract=ZZ6 bar_time=2026-10-02 15:00 note=ZU6 x1 (100 ovl, 0% off, 60 bars) -> ZZ6 x1.0061 (85 ovl, 0% off, 300 bars); skipped ZM6 (0 ovl, 0 after)
+2026-10-04T21:59:49+00:00 [ib] error 162 req 534: Historical Market Data Service error message:HMDS query returned no data: FXXP 20260619 M@EUREX Trades
+2026-10-04T21:59:53+00:00 [ib] error 162 req 537: Historical Market Data Service error message:HMDS query returned no data: FXXP 20261218 M@EUREX Trades
+2026-10-04T21:59:54+00:00 data_splice  FXXP  contract=FXXP 20261218 M bar_time=2026-10-02 16:00 note=FXXP 20260918 M x1 (94 ovl, 0% off, 64 bars) -> FXXP 20261218 M x1.0039 (77 ovl, 1% off, 312 bars); skipped FXXP 20260619 M (0 ovl, 0 after)
+2026-10-04T22:00:00+00:00 data_splice  G     contract=RZ6 bar_time=2026-10-02 15:00 note=RU6 x1.0002 (37 ovl, 0% off, 0 bars) -> RZ6 x0.99977 (100 ovl, 0% off, 360 bars)
+2026-10-04T22:00:03+00:00 data_splice  GC    contract=GCZ6 bar_time=2026-10-02 16:00 note=GCV6 x0.99229 (113 ovl, 0% off, 258 bars) -> GCZ6 x1.0078 (115 ovl, 0% off, 155 bars); skipped GCQ6 (0 ovl, 0 after)
+2026-10-04T22:00:04+00:00 missed       GC    contract=GCZ6 dir=-1 bar_time=2026-10-02 11:00 engine_px=4155.104366 note=open at bot start
+2026-10-04T22:00:08+00:00 data_splice  GF    contract=GFV6 bar_time=2026-10-02 14:00 note=GFU6 x1 (20 ovl, 0% off, 42 bars) -> GFV6 x0.9822 (30 ovl, 17% off, 66 bars); skipped GFQ6 (0 ovl, 0 after)
+2026-10-04T22:00:08+00:00 [ib] error 162 req 554: Historical Market Data Service error message:HMDS query returned no data: HEQ6@CME Trades
+2026-10-04T22:00:10+00:00 data_splice  HE    contract=HEV6 bar_time=2026-10-02 14:00 note=HEV6 x1 (20 ovl, 0% off, 108 bars); skipped HEQ6 (0 ovl, 0 after)
+2026-10-04T22:00:10+00:00 missed       HE    contract=HEV6 dir=-1 bar_time=2026-10-01 09:30 engine_px=78.31283784 note=open at bot start
+2026-10-04T22:00:14+00:00 data_splice  HG    contract=HGZ6 bar_time=2026-10-02 16:00 note=HGU6 x0.9877 (85 ovl, 0% off, 0 bars) -> HGZ6 x1.0125 (113 ovl, 0% off, 413 bars)
+2026-10-04T22:00:26+00:00 data_splice  HO    contract=HOX6 bar_time=2026-10-02 16:00 note=HOV6 x1.0834 (113 ovl, 1% off, 258 bars) -> HOX6 x0.96031 (115 ovl, 2% off, 155 bars); skipped HOU6 (0 ovl, 0 after)
+2026-10-04T22:00:50+00:00 data_splice  J1    contract=6JZ6 bar_time=2026-10-02 16:00 note=6JU6 x1 (115 ovl, 0% off, 0 bars) -> 6JZ6 x1.0071 (115 ovl, 0% off, 413 bars)
+2026-10-04T22:01:02+00:00 data_splice  J7    contract=J7Z6 bar_time=2026-10-02 16:00 note=J7U6 x1 (108 ovl, 0% off, 0 bars) -> J7Z6 x1.0071 (108 ovl, 0% off, 410 bars)
+2026-10-04T22:01:06+00:00 data_splice  KE    contract=KEZ6 bar_time=2026-10-02 14:00 note=KEU6 x0.98999 (20 ovl, 15% off, 0 bars) -> KEZ6 x1.0101 (72 ovl, 0% off, 342 bars)
+2026-10-04T22:01:09+00:00 data_splice  LE    contract=LEZ6 bar_time=2026-10-02 14:00 note=LEV6 x1 (20 ovl, 0% off, 66 bars) -> LEZ6 x1.0044 (30 ovl, 0% off, 42 bars); skipped LEQ6 (0 ovl, 0 after)
+2026-10-04T22:01:10+00:00 [ib] error 200 req 582: No security definition has been found for the request
+2026-10-04T22:01:10+00:00 excluded     MFS   note=contract unresolved (check ib_contracts.py)
+2026-10-04T22:01:14+00:00 data_splice  MGC   contract=MGCZ6 bar_time=2026-10-02 16:00 note=MGCV6 x1 (113 ovl, 0% off, 258 bars) -> MGCZ6 x1.0078 (115 ovl, 0% off, 155 bars); skipped MGCQ6 (0 ovl, 0 after)
+2026-10-04T22:01:15+00:00 [ib] error 200 req 588: No security definition has been found for the request
+2026-10-04T22:01:15+00:00 excluded     MME   note=contract unresolved (check ib_contracts.py)
+2026-10-04T22:01:26+00:00 data_splice  MP    contract=6MZ6 bar_time=2026-10-02 16:00 note=6MU6 x1 (115 ovl, 0% off, 0 bars) -> 6MZ6 x0.99291 (115 ovl, 0% off, 413 bars)
+2026-10-04T22:01:44+00:00 data_splice  N6    contract=6NZ6 bar_time=2026-10-02 16:00 note=6NU6 x1 (115 ovl, 0% off, 0 bars) -> 6NZ6 x1.0024 (115 ovl, 0% off, 413 bars)
+2026-10-04T22:02:03+00:00 data_splice  NG    contract=NGX26 bar_time=2026-10-02 16:00 note=NGV26 x1 (113 ovl, 0% off, 212 bars) -> NGX26 x1.0462 (115 ovl, 5% off, 201 bars); skipped NGU26 (0 ovl, 0 after)
+2026-10-04T22:02:08+00:00 data_splice  NIY   contract=NIYZ6 bar_time=2026-10-02 16:00 note=NIYU6 x1.0032 (111 ovl, 0% off, 0 bars) -> NIYZ6 x0.99678 (109 ovl, 0% off, 413 bars)
+2026-10-04T22:02:14+00:00 data_splice  NKD   contract=NKDZ6 bar_time=2026-10-02 16:00 note=NKDU6 x1.0006 (107 ovl, 0% off, 0 bars) -> NKDZ6 x0.99938 (104 ovl, 0% off, 413 bars)
+2026-10-04T22:02:20+00:00 data_splice  NOK   contract=NOKZ6 bar_time=2026-10-02 16:00 note=NOKU6 x1 (73 ovl, 0% off, 0 bars) -> NOKZ6 x0.99858 (50 ovl, 0% off, 382 bars)
+2026-10-04T22:02:21+00:00 [ib] error 162 req 616: Historical Market Data Service error message:HMDS query returned no data: NQM6@CME Trades
+2026-10-04T22:02:38+00:00 data_splice  NQ    contract=NQZ6 bar_time=2026-10-02 16:00 note=NQU6 x1 (111 ovl, 0% off, 68 bars) -> NQZ6 x1.01 (111 ovl, 0% off, 345 bars); skipped NQM6 (0 ovl, 0 after)
+2026-10-04T22:03:02+00:00 data_splice  PA    contract=PAZ6 bar_time=2026-10-02 16:00 note=PAU6 x0.99509 (18 ovl, 6% off, 0 bars) -> PAZ6 x1.0049 (113 ovl, 0% off, 413 bars)
+2026-10-04T22:03:04+00:00 [ib] error 162 req 625: Historical Market Data Service error message:HMDS query returned no data: PLN6@NYMEX Trades
+2026-10-04T22:03:06+00:00 data_splice  PL    contract=PLF7 bar_time=2026-10-02 16:00 note=PLV6 x1 (113 ovl, 0% off, 258 bars) -> PLF7 x1.0122 (115 ovl, 0% off, 155 bars); skipped PLN6 (0 ovl, 0 after)
+2026-10-04T22:03:14+00:00 data_splice  RB    contract=RBX6 bar_time=2026-10-02 16:00 note=RBV6 x1.1243 (112 ovl, 14% off, 258 bars) -> RBX6 x0.92394 (115 ovl, 1% off, 155 bars); skipped RBU6 (0 ovl, 0 after)
+2026-10-04T22:03:20+00:00 data_splice  RP    contract=RPZ6 bar_time=2026-10-02 16:00 note=RPU6 x1 (114 ovl, 0% off, 0 bars) -> RPZ6 x1.0033 (100 ovl, 0% off, 411 bars)
+2026-10-04T22:03:25+00:00 [ib] error 162 req 639: Historical Market Data Service error message:HMDS query returned no data: RSN6@NYBOT Trades
+2026-10-04T22:03:26+00:00 data_splice  RS    contract=RSX6 bar_time=2026-10-02 14:00 note=RSX6 x1 (76 ovl, 0% off, 323 bars); skipped RSN6 (0 ovl, 0 after)
+2026-10-04T22:03:37+00:00 [ib] error 162 req 643: Historical Market Data Service error message:HMDS query returned no data: RTYM6@CME Trades
+2026-10-04T22:04:02+00:00 data_splice  RTY   contract=RTYZ6 bar_time=2026-10-02 16:00 note=RTYU6 x1 (111 ovl, 0% off, 68 bars) -> RTYZ6 x1.0074 (111 ovl, 0% off, 345 bars); skipped RTYM6 (0 ovl, 0 after)
+2026-10-04T22:04:05+00:00 data_splice  RY    contract=RYZ6 bar_time=2026-10-02 16:00 note=RYU6 x1 (114 ovl, 0% off, 0 bars) -> RYZ6 x0.99642 (102 ovl, 0% off, 413 bars)
+2026-10-04T22:04:07+00:00 [ib] error 162 req 652: Historical Market Data Service error message:HMDS query returned no data: SBN6@NYBOT Trades
+2026-10-04T22:04:09+00:00 data_splice  SB    contract=SBH7 bar_time=2026-10-02 12:00 note=SBV6 x1 (36 ovl, 0% off, 110 bars) -> SBH7 x1.0522 (50 ovl, 0% off, 70 bars); skipped SBN6 (0 ovl, 0 after)
+2026-10-04T22:04:14+00:00 data_splice  SEK   contract=SEKZ6 bar_time=2026-10-02 16:00 note=SEKU6 x1 (84 ovl, 0% off, 0 bars) -> SEKZ6 x1.005 (68 ovl, 0% off, 371 bars)
+2026-10-04T22:04:20+00:00 data_splice  SI    contract=SIZ6 bar_time=2026-10-02 16:00 note=SIU6 x0.9879 (90 ovl, 3% off, 0 bars) -> SIZ6 x1.0122 (113 ovl, 0% off, 413 bars)
+2026-10-04T22:04:21+00:00 [ib] error 162 req 665: Historical Market Data Service error message:HMDS query returned no data: SIRM6@CME Trades
+2026-10-04T22:04:30+00:00 [ib] error 162 req 667: Historical Market Data Service error message:HMDS query returned no data: SIRZ6@CME Trades
+2026-10-04T22:04:31+00:00 data_splice  SIR   contract=SIRZ6 bar_time=2026-09-21 23:00 note=SIRU6 x1 (82 ovl, 0% off, 172 bars); skipped SIRM6 (0 ovl, 0 after), SIRZ6 (0 ovl, 0 after), ACTIVE SIRZ6 contributed no bars
+2026-10-04T22:04:50+00:00 data_splice  TN    contract=TNZ6 bar_time=2026-10-02 16:00 note=TNU6 x1 (48 ovl, 0% off, 0 bars) -> TNZ6 x0.99714 (48 ovl, 0% off, 414 bars)
+2026-10-04T22:05:02+00:00 data_splice  UB    contract=UBZ6 bar_time=2026-10-02 16:00 note=UBU6 x1.0045 (59 ovl, 0% off, 0 bars) -> UBZ6 x0.99548 (91 ovl, 0% off, 413 bars)
+2026-10-04T22:05:06+00:00 data_splice  XC    contract=XCZ6 bar_time=2026-10-02 14:00 note=XCZ6 x1 (72 ovl, 0% off, 342 bars); skipped XCU6 (7 ovl, 2 after)
+2026-10-04T22:05:07+00:00 [ib] error 162 req 682: Historical Market Data Service error message:HMDS query returned no data: YMM6@CBOT Trades
+2026-10-04T22:05:14+00:00 data_splice  YM    contract=YMZ6 bar_time=2026-10-02 16:00 note=YMU6 x1 (111 ovl, 0% off, 68 bars) -> YMZ6 x1.0078 (111 ovl, 0% off, 345 bars); skipped YMM6 (0 ovl, 0 after)
+2026-10-04T22:05:17+00:00 data_splice  ZC    contract=ZCZ6 bar_time=2026-10-02 14:00 note=ZCU6 x0.95712 (48 ovl, 2% off, 0 bars) -> ZCZ6 x1.0448 (72 ovl, 0% off, 342 bars)
+2026-10-04T22:05:26+00:00 data_splice  ZF    contract=ZFZ6 bar_time=2026-10-02 16:00 note=ZFU6 x1.0014 (108 ovl, 0% off, 0 bars) -> ZFZ6 x0.99859 (111 ovl, 0% off, 413 bars)
+2026-10-04T22:05:44+00:00 data_splice  ZL    contract=ZLZ6 bar_time=2026-10-02 14:00 note=ZLV6 x1 (72 ovl, 0% off, 213 bars) -> ZLZ6 x1.0079 (95 ovl, 0% off, 129 bars); skipped ZLU6 (8 ovl, 25 after)
+2026-10-04T22:06:03+00:00 data_splice  ZM    contract=ZMZ6 bar_time=2026-10-02 14:00 note=ZMU6 x0.99167 (58 ovl, 7% off, 0 bars) -> ZMV6 x1.0084 (72 ovl, 0% off, 213 bars) -> ZMZ6 x1.0071 (95 ovl, 0% off, 129 bars)
+2026-10-04T22:06:06+00:00 data_splice  ZN    contract=ZNZ6 bar_time=2026-10-02 16:00 note=ZNU6 x1.0023 (98 ovl, 0% off, 0 bars) -> ZNZ6 x0.99768 (102 ovl, 0% off, 413 bars)
+2026-10-04T22:06:10+00:00 data_splice  ZS    contract=ZSX6 bar_time=2026-10-02 14:00 note=ZSU6 x0.99133 (61 ovl, 0% off, 0 bars) -> ZSX6 x1.0087 (72 ovl, 0% off, 342 bars)
+2026-10-04T22:06:14+00:00 data_splice  ZT    contract=ZTZ6 bar_time=2026-10-02 16:00 note=ZTU6 x1.0016 (98 ovl, 0% off, 0 bars) -> ZTZ6 x0.99844 (111 ovl, 0% off, 413 bars)
+2026-10-04T22:06:20+00:00 pass done in 619s | held 0: none | excluded 2

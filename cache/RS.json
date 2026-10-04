@@ -1,0 +1,21 @@
+{
+ "conId": 715846537,
+ "local": "RSX6",
+ "exchange": "NYBOT",
+ "currency": "CAD",
+ "skipped": [
+  "RSN6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-23",
+ "vendor_end": "2026-09-08 14:00",
+ "splice": [
+  {
+   "contract": "RSX6",
+   "ratio": 1.0,
+   "overlap": 76,
+   "off": 0.0,
+   "bars": 323
+  }
+ ],
+ "rolls": []
+}

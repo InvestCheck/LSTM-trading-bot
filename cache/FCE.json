@@ -1,0 +1,28 @@
+{
+ "conId": 903093552,
+ "local": "FCEV6",
+ "exchange": "MONEP",
+ "currency": "EUR",
+ "skipped": [
+  "FCEQ6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-09",
+ "vendor_end": "2026-09-08 15:00",
+ "splice": [
+  {
+   "contract": "FCEU6",
+   "ratio": 1.0,
+   "overlap": 70,
+   "off": 0.0,
+   "bars": 42
+  },
+  {
+   "contract": "FCEV6",
+   "ratio": 0.9991796608248844,
+   "overlap": 58,
+   "off": 0.0,
+   "bars": 210
+  }
+ ],
+ "rolls": []
+}

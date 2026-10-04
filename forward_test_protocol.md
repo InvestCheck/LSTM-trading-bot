@@ -84,6 +84,16 @@ logging             every order, fill and roll is logged with a timestamp;
                     actual fill price
 ```
 
+## Executable subset
+
+Checked against the IBKR paper account before the start (verify_contracts.py,
+contract_check.csv): 68 of the 70 are executable. MFS and MME are not listed at
+IBKR under any identifier and are excluded from execution; SIR is listed but
+IBKR carries no price history for it, so it stays dormant unless data appears.
+The frozen universe is still all 70; results are reported on the executed set
+and the exclusions are recorded in trade_log.csv at the start. No instrument is
+added or removed after the start for any other reason.
+
 ## Contract rolls
 
 The backtest ran on ratio adjusted continuous data, so a position held across a

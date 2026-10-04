@@ -1,0 +1,26 @@
+{
+ "conId": 866514737,
+ "local": "UBZ6",
+ "exchange": "CBOT",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "UBU6",
+   "ratio": 1.0045402946026585,
+   "overlap": 59,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "UBZ6",
+   "ratio": 0.9954802265005663,
+   "overlap": 91,
+   "off": 0.0,
+   "bars": 413
+  }
+ ],
+ "rolls": []
+}

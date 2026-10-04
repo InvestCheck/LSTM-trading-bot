@@ -1,0 +1,26 @@
+{
+ "conId": 715358244,
+ "local": "KEZ6",
+ "exchange": "CBOT",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 14:00",
+ "splice": [
+  {
+   "contract": "KEU6",
+   "ratio": 0.9899858930819103,
+   "overlap": 20,
+   "off": 0.15,
+   "bars": 0
+  },
+  {
+   "contract": "KEZ6",
+   "ratio": 1.0101154036517783,
+   "overlap": 72,
+   "off": 0.0,
+   "bars": 342
+  }
+ ],
+ "rolls": []
+}

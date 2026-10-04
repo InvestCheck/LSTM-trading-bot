@@ -1,0 +1,26 @@
+{
+ "conId": 791943660,
+ "local": "RYZ6",
+ "exchange": "CME",
+ "currency": "JPY",
+ "skipped": [],
+ "roll_date": "2026-12-07",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "RYU6",
+   "ratio": 1.0,
+   "overlap": 114,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "RYZ6",
+   "ratio": 0.9964248801252535,
+   "overlap": 102,
+   "off": 0.0,
+   "bars": 413
+  }
+ ],
+ "rolls": []
+}

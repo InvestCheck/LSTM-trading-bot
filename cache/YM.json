@@ -1,0 +1,28 @@
+{
+ "conId": 840227352,
+ "local": "YMZ6",
+ "exchange": "CBOT",
+ "currency": "USD",
+ "skipped": [
+  "YMM6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-12-11",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "YMU6",
+   "ratio": 1.0,
+   "overlap": 111,
+   "off": 0.0,
+   "bars": 68
+  },
+  {
+   "contract": "YMZ6",
+   "ratio": 1.0077709378324973,
+   "overlap": 111,
+   "off": 0.0,
+   "bars": 345
+  }
+ ],
+ "rolls": []
+}

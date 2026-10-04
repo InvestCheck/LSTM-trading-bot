@@ -1,0 +1,28 @@
+{
+ "conId": 339981291,
+ "local": "BZZ6",
+ "exchange": "NYMEX",
+ "currency": "USD",
+ "skipped": [
+  "BZV6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-23",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "BZX6",
+   "ratio": 1.0,
+   "overlap": 113,
+   "off": 0.0,
+   "bars": 258
+  },
+  {
+   "contract": "BZZ6",
+   "ratio": 0.9584931641585522,
+   "overlap": 115,
+   "off": 0.0,
+   "bars": 155
+  }
+ ],
+ "rolls": []
+}

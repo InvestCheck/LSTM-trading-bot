@@ -1,0 +1,26 @@
+{
+ "conId": 869928219,
+ "local": "ZTZ6",
+ "exchange": "CBOT",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "ZTU6",
+   "ratio": 1.0015614588755586,
+   "overlap": 98,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "ZTZ6",
+   "ratio": 0.9984409754771199,
+   "overlap": 111,
+   "off": 0.0,
+   "bars": 413
+  }
+ ],
+ "rolls": []
+}

@@ -1,0 +1,28 @@
+{
+ "conId": 462941472,
+ "local": "GCZ6",
+ "exchange": "COMEX",
+ "currency": "USD",
+ "skipped": [
+  "GCQ6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "GCV6",
+   "ratio": 0.9922874005186444,
+   "overlap": 113,
+   "off": 0.0,
+   "bars": 258
+  },
+  {
+   "contract": "GCZ6",
+   "ratio": 1.0078151857539017,
+   "overlap": 115,
+   "off": 0.0,
+   "bars": 155
+  }
+ ],
+ "rolls": []
+}

@@ -1,0 +1,28 @@
+{
+ "conId": 600696516,
+ "local": "RBX6",
+ "exchange": "NYMEX",
+ "currency": "USD",
+ "skipped": [
+  "RBU6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-23",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "RBV6",
+   "ratio": 1.1243009787266653,
+   "overlap": 112,
+   "off": 0.143,
+   "bars": 258
+  },
+  {
+   "contract": "RBX6",
+   "ratio": 0.9239394452917585,
+   "overlap": 115,
+   "off": 0.009,
+   "bars": 155
+  }
+ ],
+ "rolls": []
+}

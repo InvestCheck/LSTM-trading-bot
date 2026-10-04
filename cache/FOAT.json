@@ -1,0 +1,26 @@
+{
+ "conId": 862202625,
+ "local": "FOAT 20261208 M",
+ "exchange": "EUREX",
+ "currency": "EUR",
+ "skipped": [],
+ "roll_date": "2026-12-01",
+ "vendor_end": "2026-09-08 15:00",
+ "splice": [
+  {
+   "contract": "FOAT 20260908 M",
+   "ratio": 1.0064707939839104,
+   "overlap": 89,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "FOAT 20261208 M",
+   "ratio": 0.9935708079930495,
+   "overlap": 95,
+   "off": 0.0,
+   "bars": 379
+  }
+ ],
+ "rolls": []
+}

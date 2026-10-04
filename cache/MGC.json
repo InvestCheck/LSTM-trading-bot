@@ -1,0 +1,28 @@
+{
+ "conId": 751494403,
+ "local": "MGCZ6",
+ "exchange": "COMEX",
+ "currency": "USD",
+ "skipped": [
+  "MGCQ6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "MGCV6",
+   "ratio": 1.0,
+   "overlap": 113,
+   "off": 0.0,
+   "bars": 258
+  },
+  {
+   "contract": "MGCZ6",
+   "ratio": 1.0077676150204533,
+   "overlap": 115,
+   "off": 0.0,
+   "bars": 155
+  }
+ ],
+ "rolls": []
+}

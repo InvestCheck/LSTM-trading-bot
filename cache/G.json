@@ -1,0 +1,26 @@
+{
+ "conId": 869635666,
+ "local": "RZ6",
+ "exchange": "ICEEU",
+ "currency": "GBP",
+ "skipped": [],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 15:00",
+ "splice": [
+  {
+   "contract": "RU6",
+   "ratio": 1.0002331002331002,
+   "overlap": 37,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "RZ6",
+   "ratio": 0.9997669540899558,
+   "overlap": 100,
+   "off": 0.0,
+   "bars": 360
+  }
+ ],
+ "rolls": []
+}

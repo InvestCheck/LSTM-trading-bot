@@ -1,0 +1,28 @@
+{
+ "conId": 304037511,
+ "local": "CLX6",
+ "exchange": "NYMEX",
+ "currency": "USD",
+ "skipped": [
+  "CLU6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-13",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "CLV6",
+   "ratio": 1.0,
+   "overlap": 113,
+   "off": 0.0,
+   "bars": 120
+  },
+  {
+   "contract": "CLX6",
+   "ratio": 0.9579029428961215,
+   "overlap": 115,
+   "off": 0.07,
+   "bars": 293
+  }
+ ],
+ "rolls": []
+}

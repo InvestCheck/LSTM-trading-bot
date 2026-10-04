@@ -1,0 +1,26 @@
+{
+ "conId": 791943657,
+ "local": "RPZ6",
+ "exchange": "CME",
+ "currency": "GBP",
+ "skipped": [],
+ "roll_date": "2026-12-07",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "RPU6",
+   "ratio": 1.0,
+   "overlap": 114,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "RPZ6",
+   "ratio": 1.0033444481018678,
+   "overlap": 100,
+   "off": 0.0,
+   "bars": 411
+  }
+ ],
+ "rolls": []
+}

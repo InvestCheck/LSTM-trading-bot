@@ -1,0 +1,28 @@
+{
+ "conId": 361002955,
+ "local": "COILZ6",
+ "exchange": "IPE",
+ "currency": "USD",
+ "skipped": [
+  "COILV6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-23",
+ "vendor_end": "2026-09-08 17:00",
+ "splice": [
+  {
+   "contract": "COILX6",
+   "ratio": 1.0,
+   "overlap": 108,
+   "off": 0.0,
+   "bars": 250
+  },
+  {
+   "contract": "COILZ6",
+   "ratio": 0.9585403159570776,
+   "overlap": 112,
+   "off": 0.0,
+   "bars": 152
+  }
+ ],
+ "rolls": []
+}

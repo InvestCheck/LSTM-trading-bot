@@ -1,0 +1,28 @@
+{
+ "conId": 269460170,
+ "local": "NGX26",
+ "exchange": "NYMEX",
+ "currency": "USD",
+ "skipped": [
+  "NGU26 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-21",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "NGV26",
+   "ratio": 1.0,
+   "overlap": 113,
+   "off": 0.0,
+   "bars": 212
+  },
+  {
+   "contract": "NGX26",
+   "ratio": 1.04623878536922,
+   "overlap": 115,
+   "off": 0.052,
+   "bars": 201
+  }
+ ],
+ "rolls": []
+}

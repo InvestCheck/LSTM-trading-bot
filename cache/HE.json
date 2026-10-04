@@ -1,0 +1,21 @@
+{
+ "conId": 784098146,
+ "local": "HEV6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [
+  "HEQ6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-07",
+ "vendor_end": "2026-09-08 14:00",
+ "splice": [
+  {
+   "contract": "HEV6",
+   "ratio": 1.0,
+   "overlap": 20,
+   "off": 0.0,
+   "bars": 108
+  }
+ ],
+ "rolls": []
+}

@@ -1,0 +1,28 @@
+{
+ "conId": 563947726,
+ "local": "NQZ6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [
+  "NQM6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-12-11",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "NQU6",
+   "ratio": 1.0,
+   "overlap": 111,
+   "off": 0.0,
+   "bars": 68
+  },
+  {
+   "contract": "NQZ6",
+   "ratio": 1.0100173954771758,
+   "overlap": 111,
+   "off": 0.0,
+   "bars": 345
+  }
+ ],
+ "rolls": []
+}

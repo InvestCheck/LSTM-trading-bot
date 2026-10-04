@@ -1,0 +1,28 @@
+{
+ "conId": 790105750,
+ "local": "LEZ6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [
+  "LEQ6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 14:00",
+ "splice": [
+  {
+   "contract": "LEV6",
+   "ratio": 1.0,
+   "overlap": 20,
+   "off": 0.0,
+   "bars": 66
+  },
+  {
+   "contract": "LEZ6",
+   "ratio": 1.0043694024574872,
+   "overlap": 30,
+   "off": 0.0,
+   "bars": 42
+  }
+ ],
+ "rolls": []
+}

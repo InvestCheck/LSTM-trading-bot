@@ -1,0 +1,28 @@
+{
+ "conId": 903093547,
+ "local": "FTIV6",
+ "exchange": "FTA",
+ "currency": "EUR",
+ "skipped": [
+  "FTIQ6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-09",
+ "vendor_end": "2026-09-08 15:00",
+ "splice": [
+  {
+   "contract": "FTIU6",
+   "ratio": 1.0,
+   "overlap": 70,
+   "off": 0.0,
+   "bars": 42
+  },
+  {
+   "contract": "FTIV6",
+   "ratio": 1.002723806065008,
+   "overlap": 51,
+   "off": 0.0,
+   "bars": 210
+  }
+ ],
+ "rolls": []
+}

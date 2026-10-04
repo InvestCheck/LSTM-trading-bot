@@ -1,0 +1,26 @@
+{
+ "conId": 862202566,
+ "local": "FGBM 20261208 M",
+ "exchange": "EUREX",
+ "currency": "EUR",
+ "skipped": [],
+ "roll_date": "2026-12-01",
+ "vendor_end": "2026-09-08 16:00",
+ "splice": [
+  {
+   "contract": "FGBM 20260908 M",
+   "ratio": 0.9976169461606356,
+   "overlap": 93,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "FGBM 20261208 M",
+   "ratio": 1.0023887463505263,
+   "overlap": 98,
+   "off": 0.0,
+   "bars": 378
+  }
+ ],
+ "rolls": []
+}

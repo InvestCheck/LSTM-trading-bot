@@ -1,0 +1,26 @@
+{
+ "conId": 866514750,
+ "local": "ZNZ6",
+ "exchange": "CBOT",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "ZNU6",
+   "ratio": 1.0023255813953489,
+   "overlap": 98,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "ZNZ6",
+   "ratio": 0.9976798143851507,
+   "overlap": 102,
+   "off": 0.0,
+   "bars": 413
+  }
+ ],
+ "rolls": []
+}

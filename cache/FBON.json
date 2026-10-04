@@ -1,0 +1,26 @@
+{
+ "conId": 862202545,
+ "local": "FBON 20261208 M",
+ "exchange": "EUREX",
+ "currency": "EUR",
+ "skipped": [],
+ "roll_date": "2026-12-01",
+ "vendor_end": "2026-09-08 11:00",
+ "splice": [
+  {
+   "contract": "FBON 20260908 M",
+   "ratio": 1.0031334688346885,
+   "overlap": 21,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "FBON 20261208 M",
+   "ratio": 0.9976769928940642,
+   "overlap": 24,
+   "off": 0.0,
+   "bars": 186
+  }
+ ],
+ "rolls": []
+}

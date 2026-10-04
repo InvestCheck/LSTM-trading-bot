@@ -1,0 +1,28 @@
+{
+ "conId": 515416632,
+ "local": "ESZ6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [
+  "ESM6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-12-11",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "ESU6",
+   "ratio": 1.0,
+   "overlap": 111,
+   "off": 0.0,
+   "bars": 68
+  },
+  {
+   "contract": "ESZ6",
+   "ratio": 1.0086789754258223,
+   "overlap": 111,
+   "off": 0.0,
+   "bars": 345
+  }
+ ],
+ "rolls": []
+}

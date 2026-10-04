@@ -1,0 +1,28 @@
+{
+ "conId": 680895289,
+ "local": "PLF7",
+ "exchange": "NYMEX",
+ "currency": "USD",
+ "skipped": [
+  "PLN6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-12-24",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "PLV6",
+   "ratio": 1.0,
+   "overlap": 113,
+   "off": 0.0,
+   "bars": 258
+  },
+  {
+   "contract": "PLF7",
+   "ratio": 1.0122476371567586,
+   "overlap": 115,
+   "off": 0.0,
+   "bars": 155
+  }
+ ],
+ "rolls": []
+}

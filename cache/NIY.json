@@ -1,0 +1,26 @@
+{
+ "conId": 459557850,
+ "local": "NIYZ6",
+ "exchange": "CME",
+ "currency": "JPY",
+ "skipped": [],
+ "roll_date": "2026-12-03",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "NIYU6",
+   "ratio": 1.0032272936837252,
+   "overlap": 111,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "NIYZ6",
+   "ratio": 0.9967830882352942,
+   "overlap": 109,
+   "off": 0.0,
+   "bars": 413
+  }
+ ],
+ "rolls": []
+}

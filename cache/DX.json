@@ -1,0 +1,26 @@
+{
+ "conId": 839021595,
+ "local": "DXZ6",
+ "exchange": "NYBOT",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-12-07",
+ "vendor_end": "2026-09-08 16:00",
+ "splice": [
+  {
+   "contract": "DXU6",
+   "ratio": 1.0,
+   "overlap": 107,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "DXZ6",
+   "ratio": 0.9974710434474736,
+   "overlap": 103,
+   "off": 0.0,
+   "bars": 384
+  }
+ ],
+ "rolls": []
+}

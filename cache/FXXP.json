@@ -1,0 +1,28 @@
+{
+ "conId": 673277662,
+ "local": "FXXP 20261218 M",
+ "exchange": "EUREX",
+ "currency": "EUR",
+ "skipped": [
+  "FXXP 20260619 M (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-12-11",
+ "vendor_end": "2026-09-08 15:00",
+ "splice": [
+  {
+   "contract": "FXXP 20260918 M",
+   "ratio": 1.0,
+   "overlap": 94,
+   "off": 0.0,
+   "bars": 64
+  },
+  {
+   "contract": "FXXP 20261218 M",
+   "ratio": 1.00390625,
+   "overlap": 77,
+   "off": 0.013,
+   "bars": 312
+  }
+ ],
+ "rolls": []
+}

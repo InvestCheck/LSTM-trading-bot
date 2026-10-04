@@ -1,0 +1,8 @@
+2026-10-03T20:38:27+00:00 replay GC: stepping the last 500 bars one at a time
+2026-10-03T20:38:42+00:00 signal       GC    contract=shadow dir=1 bar_time=2026-08-10 12:00 engine_px=4420.238123 stop=4384.159036 why=res line; 3 touches; span 2616 bars; stop auto
+2026-10-03T20:38:47+00:00 stop_move    GC    contract=shadow dir=1 bar_time=2026-08-10 18:00 stop=4420.238123 note=phase 2
+2026-10-03T20:38:54+00:00 exit         GC    contract=shadow dir=1 bar_time=2026-08-11 01:00 engine_px=4435.2 R_engine=0.414697 why=21EMA
+2026-10-03T20:40:44+00:00 signal       GC    contract=shadow dir=1 bar_time=2026-08-17 20:00 engine_px=4483.674368 stop=4456.033333 why=res line; 3 touches; span 2738 bars; stop auto
+2026-10-03T20:40:46+00:00 exit         GC    contract=shadow dir=1 bar_time=2026-08-17 22:00 engine_px=4456.033333 R_engine=-1 why=stop
+2026-10-03T20:41:19+00:00 signal       GC    contract=shadow dir=1 bar_time=2026-08-19 09:00 engine_px=4507.528571 stop=4408.6 why=res line; 3 touches; span 3285 bars; stop auto
+2026-10-03T20:41:20+00:00 exit         GC    contract=shadow dir=1 bar_time=2026-08-19 10:00 engine_px=4520.514085 R_engine=0.131262 why=parabolic

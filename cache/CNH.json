@@ -1,0 +1,26 @@
+{
+ "conId": 665148638,
+ "local": "CNHZ6",
+ "exchange": "CME",
+ "currency": "CNH",
+ "skipped": [],
+ "roll_date": "2026-12-07",
+ "vendor_end": "2026-09-08 15:00",
+ "splice": [
+  {
+   "contract": "CNHU6",
+   "ratio": 1.0,
+   "overlap": 101,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "CNHZ6",
+   "ratio": 0.9936626281365797,
+   "overlap": 84,
+   "off": 0.0,
+   "bars": 386
+  }
+ ],
+ "rolls": []
+}

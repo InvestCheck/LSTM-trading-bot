@@ -1,0 +1,26 @@
+{
+ "conId": 532281530,
+ "local": "6AZ6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-12-07",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "6AU6",
+   "ratio": 1.0,
+   "overlap": 115,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "6AZ6",
+   "ratio": 0.9984081943387085,
+   "overlap": 115,
+   "off": 0.0,
+   "bars": 413
+  }
+ ],
+ "rolls": []
+}

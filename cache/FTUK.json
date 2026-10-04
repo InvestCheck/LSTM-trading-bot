@@ -1,0 +1,28 @@
+{
+ "conId": 841228424,
+ "local": "ZZ6",
+ "exchange": "ICEEU",
+ "currency": "GBP",
+ "skipped": [
+  "ZM6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-12-11",
+ "vendor_end": "2026-09-08 15:00",
+ "splice": [
+  {
+   "contract": "ZU6",
+   "ratio": 1.0,
+   "overlap": 100,
+   "off": 0.0,
+   "bars": 60
+  },
+  {
+   "contract": "ZZ6",
+   "ratio": 1.0061007086207705,
+   "overlap": 85,
+   "off": 0.0,
+   "bars": 300
+  }
+ ],
+ "rolls": []
+}

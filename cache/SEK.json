@@ -1,0 +1,26 @@
+{
+ "conId": 791943666,
+ "local": "SEKZ6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-12-07",
+ "vendor_end": "2026-09-08 16:00",
+ "splice": [
+  {
+   "contract": "SEKU6",
+   "ratio": 1.0,
+   "overlap": 84,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "SEKZ6",
+   "ratio": 1.005017921433459,
+   "overlap": 68,
+   "off": 0.0,
+   "bars": 371
+  }
+ ],
+ "rolls": []
+}

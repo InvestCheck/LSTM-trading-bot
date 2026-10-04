@@ -1,0 +1,21 @@
+{
+ "conId": 602620091,
+ "local": "XCZ6",
+ "exchange": "CBOT",
+ "currency": "USD",
+ "skipped": [
+  "XCU6 (7 ovl, 2 after)"
+ ],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 14:00",
+ "splice": [
+  {
+   "contract": "XCZ6",
+   "ratio": 1.0,
+   "overlap": 72,
+   "off": 0.0,
+   "bars": 342
+  }
+ ],
+ "rolls": []
+}

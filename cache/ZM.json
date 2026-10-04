@@ -1,0 +1,33 @@
+{
+ "conId": 602619821,
+ "local": "ZMZ6",
+ "exchange": "CBOT",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 14:00",
+ "splice": [
+  {
+   "contract": "ZMU6",
+   "ratio": 0.9916732334858189,
+   "overlap": 58,
+   "off": 0.069,
+   "bars": 0
+  },
+  {
+   "contract": "ZMV6",
+   "ratio": 1.0083966837391707,
+   "overlap": 72,
+   "off": 0.0,
+   "bars": 213
+  },
+  {
+   "contract": "ZMZ6",
+   "ratio": 1.0071135430916553,
+   "overlap": 95,
+   "off": 0.0,
+   "bars": 129
+  }
+ ],
+ "rolls": []
+}

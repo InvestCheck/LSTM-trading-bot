@@ -1,0 +1,26 @@
+{
+ "conId": 862202555,
+ "local": "FBTP 20261208 M",
+ "exchange": "EUREX",
+ "currency": "EUR",
+ "skipped": [],
+ "roll_date": "2026-12-01",
+ "vendor_end": "2026-09-08 12:00",
+ "splice": [
+  {
+   "contract": "FBTP 20260908 M",
+   "ratio": 1.006828328810295,
+   "overlap": 55,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "FBTP 20261208 M",
+   "ratio": 0.9932179810451265,
+   "overlap": 55,
+   "off": 0.0,
+   "bars": 198
+  }
+ ],
+ "rolls": []
+}

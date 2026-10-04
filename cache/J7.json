@@ -1,0 +1,26 @@
+{
+ "conId": 891916554,
+ "local": "J7Z6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-12-07",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "J7U6",
+   "ratio": 1.0,
+   "overlap": 108,
+   "off": 0.0,
+   "bars": 0
+  },
+  {
+   "contract": "J7Z6",
+   "ratio": 1.0071281527369036,
+   "overlap": 108,
+   "off": 0.0,
+   "bars": 410
+  }
+ ],
+ "rolls": []
+}

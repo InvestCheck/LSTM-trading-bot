@@ -1,0 +1,28 @@
+{
+ "conId": 817585973,
+ "local": "GFV6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [
+  "GFQ6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-10-22",
+ "vendor_end": "2026-09-08 14:00",
+ "splice": [
+  {
+   "contract": "GFU6",
+   "ratio": 1.0,
+   "overlap": 20,
+   "off": 0.0,
+   "bars": 42
+  },
+  {
+   "contract": "GFV6",
+   "ratio": 0.9822040597261894,
+   "overlap": 30,
+   "off": 0.167,
+   "bars": 66
+  }
+ ],
+ "rolls": []
+}

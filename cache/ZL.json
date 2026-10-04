@@ -1,0 +1,28 @@
+{
+ "conId": 602619503,
+ "local": "ZLZ6",
+ "exchange": "CBOT",
+ "currency": "USD",
+ "skipped": [
+  "ZLU6 (8 ovl, 25 after)"
+ ],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 14:00",
+ "splice": [
+  {
+   "contract": "ZLV6",
+   "ratio": 1.0,
+   "overlap": 72,
+   "off": 0.0,
+   "bars": 213
+  },
+  {
+   "contract": "ZLZ6",
+   "ratio": 1.0079062957540263,
+   "overlap": 95,
+   "off": 0.0,
+   "bars": 129
+  }
+ ],
+ "rolls": []
+}

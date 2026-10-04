@@ -1,0 +1,8 @@
+ts_utc,event,symbol,mode,dir,qty,contract,bar_time,engine_px,actual_px,stop,R_px,R_engine,R_actual,why,note,order_id
+2026-10-03T20:38:42+00:00,signal,GC,shadow,1,1,shadow,2026-08-10 12:00,4420.238123,,4384.159036,36.07908668,,,res line; 3 touches; span 2616 bars; stop auto,,
+2026-10-03T20:38:47+00:00,stop_move,GC,shadow,1,,shadow,2026-08-10 18:00,,,4420.238123,,,,,phase 2,
+2026-10-03T20:38:54+00:00,exit,GC,shadow,1,1,shadow,2026-08-11 01:00,4435.2,,,36.07908668,0.414697,,21EMA,,
+2026-10-03T20:40:44+00:00,signal,GC,shadow,1,1,shadow,2026-08-17 20:00,4483.674368,,4456.033333,27.64103503,,,res line; 3 touches; span 2738 bars; stop auto,,
+2026-10-03T20:40:46+00:00,exit,GC,shadow,1,1,shadow,2026-08-17 22:00,4456.033333,,,27.64103503,-1,,stop,,
+2026-10-03T20:41:19+00:00,signal,GC,shadow,1,1,shadow,2026-08-19 09:00,4507.528571,,4408.6,98.92857143,,,res line; 3 touches; span 3285 bars; stop auto,,
+2026-10-03T20:41:20+00:00,exit,GC,shadow,1,1,shadow,2026-08-19 10:00,4520.514085,,,98.92857143,0.131262,,parabolic,,

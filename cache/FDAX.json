@@ -1,0 +1,28 @@
+{
+ "conId": 673277340,
+ "local": "FDAX 20261218 M",
+ "exchange": "EUREX",
+ "currency": "EUR",
+ "skipped": [
+  "FDAX 20260619 M (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-12-11",
+ "vendor_end": "2026-09-08 16:00",
+ "splice": [
+  {
+   "contract": "FDAX 20260918 M",
+   "ratio": 1.0,
+   "overlap": 100,
+   "off": 0.0,
+   "bars": 63
+  },
+  {
+   "contract": "FDAX 20261218 M",
+   "ratio": 1.0069741647890769,
+   "overlap": 78,
+   "off": 0.0,
+   "bars": 311
+  }
+ ],
+ "rolls": []
+}

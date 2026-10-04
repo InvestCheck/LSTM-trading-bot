@@ -65,7 +65,7 @@ import numpy as np
 
 from backtest_hull import run, load_series
 from batch_backtest import build_catalog, iso
-from ib_contracts import IB as MAP, UNIVERSE, pick_active
+from ib_contracts import IB as MAP, UNIVERSE, pick_active, contract_rows
 
 # ----------------------------------------------------------------------------
 # Config (frozen; see protocol)
@@ -80,7 +80,7 @@ CACHE_DIR = "cache"
 STATE_FILE = "live_state.json"
 TRADE_LOG = "trade_log.csv"
 EVENT_LOG = "events.log"
-SPLICE_MIN_BARS, SPLICE_MAX_SPREAD = 10, 0.005   # vendor/IBKR overlap requirements
+SPLICE_MIN_BARS, SPLICE_MAX_OFF = 10, 0.6        # overlap bars needed; max share of bars off >1% from the median ratio
 MAX_CATCHUP_DAYS = 120                           # longest gap the bot will try to fill from IBKR
 FILL_WAIT_S = 20
 
@@ -265,6 +265,26 @@ class Broker:
         self._resolved[s] = (d, rd, et_today)
         return d, rd
 
+    def chain(self, s):
+        """Every traded month of s, expired ones included, as
+        [(last_trade, roll_date, ContractDetails)] sorted by last trade."""
+        from ib_async import Future
+        spec = MAP[s]
+        q = Future(symbol=spec["symbol"], exchange=spec["exchange"], currency=spec["currency"],
+                   includeExpired=True)
+        if spec["tradingClass"]:
+            q.tradingClass = spec["tradingClass"]
+        rows = contract_rows(self.ib.reqContractDetails(q) or [], spec)
+        if not rows:
+            raise DataError("contract unresolved (check ib_contracts.py)")
+        return rows
+
+    def order_contract(self, conid, exchange, currency=""):
+        """Orders go by contract id only: IBKR rejects the expiry string its own
+        contract details return for some exchanges (ICE Europe)."""
+        from ib_async import Future
+        return Future(conId=conid, exchange=exchange, currency=currency)
+
     def bars(self, contract, end, duration):
         b = self.ib.reqHistoricalData(contract, end, duration, "1 hour", "TRADES",
                                       useRTH=False, formatDate=2, keepUpToDate=False, timeout=90)
@@ -373,53 +393,100 @@ def round_stop(px, tick, d):
 
 
 def stop_tick(s, details):
-    return MAP[s].get("tick") or (details.minTick if details else 0)
+    if MAP[s].get("tick"):
+        return MAP[s]["tick"]
+    return details.minTick * (details.priceMagnifier or 1) if details else 0
 
 
 # ----------------------------------------------------------------------------
 # Data layer
 # ----------------------------------------------------------------------------
-def build_cache(s, broker, catalog, now_utc, et_today):
-    """First run for a symbol: vendor history spliced to the active contract."""
+def assemble_series(s, broker, catalog, now_utc, et_today):
+    """Vendor history plus IBKR bars, chained through every contract that was
+    active since the vendor file ended, ratio adjusted at each hand off exactly
+    like a roll. Returns (rows, meta); writes nothing."""
     if s not in catalog:
         raise DataError(f"no vendor file in {DATA_DIR}")
     T, O, H, L, C = load_series(catalog[s])
+    rows = [(int(T[i]), float(O[i]), float(H[i]), float(L[i]), float(C[i])) for i in range(len(T))]
+    vendor_end = rows[-1][0]
+    vendor_end_date = datetime.fromtimestamp(vendor_end, UTC).date()
+    active, active_rd = broker.resolve(s, et_today)
+    chain = broker.chain(s)
+    first = next((i for i, (ltd, rd, d) in enumerate(chain) if rd >= vendor_end_date), len(chain))
+    chain = chain[max(0, first - 1):]
+    stop = next((i for i, (ltd, rd, d) in enumerate(chain) if d.contract.conId == active.contract.conId), None)
+    if stop is None:
+        raise DataError("active contract missing from contract chain")
+    chain = chain[:stop + 1]
+
+    fetched = []
+    for ltd, rd, d in chain:
+        c = d.contract
+        c.includeExpired = True
+        bars = broker.bars_back_to(c, vendor_ts_to_utc(vendor_end) - timedelta(days=5), now_utc)
+        bars = sorted({(vendor_ts(b.date), b.open, b.high, b.low, b.close)
+                       for b in bars if bar_complete(b, now_utc)})
+        fetched.append((d, rd, bars))
+
+    series = {r[0]: r for r in rows}
+    cur_end, splices, skipped = vendor_end, [], []
+    for i, (d, rd, bars) in enumerate(fetched):
+        after = [b for b in bars if b[0] > cur_end]
+        window = cur_end - 7 * 86400          # only the days right before the hand off count
+        overlap = [(b[4], series[b[0]][4]) for b in bars
+                   if window < b[0] <= cur_end and b[0] in series and series[b[0]][4]]
+        if len(overlap) < SPLICE_MIN_BARS:
+            # thin or expired month: skip it, a later contract in the chain must bridge instead
+            skipped.append(f"{d.contract.localSymbol} ({len(overlap)} ovl, {len(after)} after)")
+            continue
+        ratios = [a / b for a, b in overlap[-240:]]
+        med = st.median(ratios)
+        off = sum(1 for r in ratios if abs(r / med - 1) > 0.01) / len(ratios)
+        if off > SPLICE_MAX_OFF:
+            raise DataError(f"splice unstable at {d.contract.localSymbol}: {off:.0%} of {len(ratios)} "
+                            f"overlap bars off >1% (wrong contract or misaligned times)")
+        rows = [(t, o * med, h * med, l * med, cl * med) for (t, o, h, l, cl) in rows]
+        series = {r[0]: r for r in rows}
+        if i < len(fetched) - 1:
+            boundary = int(datetime(rd.year, rd.month, rd.day, 23, 59, 59, tzinfo=UTC).timestamp())
+            nxt_first = min((b[0] for b in fetched[i + 1][2]), default=None)
+            seg_end = boundary if nxt_first is None else max(boundary, nxt_first + 12 * 3600)
+        else:
+            seg_end = float("inf")
+        seg = [b for b in after if b[0] <= seg_end]
+        rows.extend(seg)
+        series.update({b[0]: b for b in seg})
+        if seg:
+            cur_end = seg[-1][0]
+        splices.append(dict(contract=d.contract.localSymbol, ratio=med, overlap=len(overlap),
+                            off=round(off, 3), bars=len(seg)))
+    if not splices:
+        raise DataError("splice: no contract overlaps the series; skipped " + ", ".join(skipped))
+    if not any(x["contract"] == active.contract.localSymbol for x in splices):
+        skipped.append(f"ACTIVE {active.contract.localSymbol} contributed no bars")
+    rows.sort(key=lambda r: r[0])
+    c = active.contract
+    meta = dict(conId=c.conId, local=c.localSymbol, exchange=c.exchange, currency=c.currency,
+                skipped=skipped,
+                roll_date=active_rd.isoformat(), vendor_end=iso(vendor_end), splice=splices, rolls=[])
+    return rows, meta
+
+
+def build_cache(s, broker, catalog, now_utc, et_today):
+    """First run for a symbol: vendor history spliced to today's active contract."""
     if broker is None:
+        T, O, H, L, C = load_series(catalog[s])
         write_cache(s, zip(T.tolist(), O.tolist(), H.tolist(), L.tolist(), C.tolist()))
         write_meta(s, dict(conId=None, local="vendor", splice=None))
         return
-    d, rd = broker.resolve(s, et_today)
-    c = d.contract
-    seed_end = vendor_ts_to_utc(int(T[-1]))
-    bars = [b for b in broker.bars_back_to(c, seed_end - timedelta(days=5), now_utc)
-            if bar_complete(b, now_utc)]
-    if not bars:
-        raise DataError("no IBKR bars for active contract")
-    vend = {int(t): float(cl) for t, cl in zip(T.tolist(), C.tolist())}
-    matched = [(vendor_ts(b.date), b.close) for b in bars if vendor_ts(b.date) in vend]
-    if len(matched) < SPLICE_MIN_BARS:
-        raise DataError(f"splice: only {len(matched)} bars overlap the vendor file; "
-                        f"vendor ends {iso(int(T[-1]))}, IBKR bars start {bars[0].date:%Y-%m-%d}")
-    ratios = [cl / vend[t] for t, cl in matched[-48:] if vend[t]]
-    med = st.median(ratios)
-    spread = max(abs(r / med - 1) for r in ratios)
-    if spread > SPLICE_MAX_SPREAD:
-        raise DataError(f"splice unstable: ratio spread {spread:.2%} (wrong contract or misaligned times)")
-    first_ib = vendor_ts(bars[0].date)
-    rows = [(int(T[i]), O[i] * med, H[i] * med, L[i] * med, C[i] * med)
-            for i in range(len(T)) if int(T[i]) < first_ib]
-    seen = set()
-    for b in bars:
-        t = vendor_ts(b.date)
-        if t not in seen:
-            seen.add(t); rows.append((t, b.open, b.high, b.low, b.close))
-    rows.sort(key=lambda r: r[0])
+    rows, meta = assemble_series(s, broker, catalog, now_utc, et_today)
     write_cache(s, rows)
-    write_meta(s, dict(conId=c.conId, local=c.localSymbol, roll_date=rd.isoformat(),
-                       splice=dict(at=iso(first_ib), ratio=med, spread=spread, overlap=len(matched)),
-                       rolls=[]))
-    log_trade("data_splice", s, contract=c.localSymbol, bar_time=iso(first_ib),
-              note=f"vendor x{med:.6g}, {len(matched)} overlap bars, spread {spread:.3%}")
+    write_meta(s, meta)
+    log_trade("data_splice", s, contract=meta["local"], bar_time=iso(rows[-1][0]),
+              note=" -> ".join(f"{x['contract']} x{x['ratio']:.5g} ({x['overlap']} ovl, {x['off']:.0%} off, "
+                               f"{x['bars']} bars)" for x in meta["splice"])
+              + (("; skipped " + ", ".join(meta["skipped"])) if meta["skipped"] else ""))
 
 
 def update_cache(s, broker, now_utc, et_today):
@@ -447,7 +514,8 @@ def update_cache(s, broker, now_utc, et_today):
         rescale_cache(s, ratio)
         meta.setdefault("rolls", []).append(dict(date=et_today.isoformat(), frm=meta.get("local"),
                                                  to=c.localSymbol, ratio=ratio))
-        meta.update(conId=c.conId, local=c.localSymbol, roll_date=rd.isoformat())
+        meta.update(conId=c.conId, local=c.localSymbol, exchange=c.exchange, currency=c.currency,
+                    roll_date=rd.isoformat())
         write_meta(s, meta)
         log_trade("data_roll", s, contract=c.localSymbol,
                   note=f"{meta['rolls'][-1]['frm']} -> {c.localSymbol} x{ratio:.6g} ({how})")
@@ -493,6 +561,7 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc):
     positions = state["positions"]
     P = positions.get(s)
     c = details.contract if details else None
+    oc = broker.order_contract(c.conId, c.exchange, c.currency) if (c and broker) else None
     local = c.localSymbol if c else "shadow"
     tick = stop_tick(s, details)
     closed = {(int(T[x["t0"]]), x["dir"]): x for x in trades}
@@ -520,13 +589,13 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc):
             # contract roll: data series already rescaled, engine stop is in new units
             if paper and c and P["con_id"] != c.conId:
                 broker.cancel(P["stop_order_id"])
-                old = broker.contract_by_conid(P["con_id"])
+                old = broker.order_contract(P["con_id"], P.get("exchange") or c.exchange)
                 fx, oid = broker.close(old)
                 log_trade("roll_close", s, contract=P["local"], dir=P["dir"], qty=P["qty"],
                           bar_time=iso(last_ts), actual_px=fx, order_id=oid)
                 spx = round_stop(op["stop"], tick, P["dir"])
-                eid, sid, fill, status = broker.place_entry(c, P["dir"], P["qty"], spx)
-                P.update(con_id=c.conId, local=c.localSymbol, entry_order_id=eid,
+                eid, sid, fill, status = broker.place_entry(oc, P["dir"], P["qty"], spx)
+                P.update(con_id=c.conId, local=c.localSymbol, exchange=c.exchange, entry_order_id=eid,
                          stop_order_id=sid, fill=fill, broker_closed=None, stop=op["stop"])
                 P.setdefault("rolls", []).append(dict(at=iso(last_ts), close=fx, open=fill))
                 log_trade("roll_open", s, contract=c.localSymbol, dir=P["dir"], qty=P["qty"],
@@ -538,7 +607,7 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc):
                 note = ""
                 if paper and P.get("broker_closed") is None:
                     spx = round_stop(op["stop"], tick, P["dir"])
-                    P["stop_order_id"], note = broker.modify_stop(c, P["stop_order_id"], P["dir"], P["qty"], spx)
+                    P["stop_order_id"], note = broker.modify_stop(oc, P["stop_order_id"], P["dir"], P["qty"], spx)
                 P["stop"], P["phase"] = op["stop"], op["phase"]
                 log_trade("stop_move", s, contract=local, dir=P["dir"], bar_time=iso(last_ts),
                           stop=op["stop"], note=(f"phase {op['phase']} " + note).strip())
@@ -559,7 +628,7 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc):
                     note = (note + " filled earlier by broker stop").strip()
                 else:
                     broker.cancel(P["stop_order_id"])
-                    actual, oid = broker.close(broker.contract_by_conid(P["con_id"]))
+                    actual, oid = broker.close(broker.order_contract(P["con_id"], P.get("exchange") or c.exchange))
                     if actual is None and oid is None:
                         actual = broker.fill_of(P["stop_order_id"])
                         note = (note + " already flat, stop fill used").strip()
@@ -581,14 +650,14 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc):
             spx = round_stop(op["stop0"], tick, op["dir"])
             P = dict(entry_ts=t0ts, dir=op["dir"], entry=op["entry"], stop0=op["stop0"],
                      stop=op["stop"], R=op["R"], phase=op["phase"], qty=QTY,
-                     con_id=c.conId if c else None, local=local, fill=None,
+                     con_id=c.conId if c else None, local=local, exchange=c.exchange if c else None, fill=None,
                      entry_order_id=None, stop_order_id=None, broker_closed=None,
                      opened=datetime.now(UTC).isoformat(timespec="seconds"))
             why = f"{op['kind']} line; {len(op['tch'])} touches; span {op['t0'] - op['a']} bars; stop {op['stop_src']}"
             log_trade("signal", s, contract=local, dir=op["dir"], qty=QTY, bar_time=iso(t0ts),
                       engine_px=op["entry"], stop=op["stop0"], R_px=op["R"], why=why)
             if paper:
-                eid, sid, fill, status = broker.place_entry(c, op["dir"], QTY, spx)
+                eid, sid, fill, status = broker.place_entry(oc, op["dir"], QTY, spx)
                 P.update(entry_order_id=eid, stop_order_id=sid, fill=fill)
                 log_trade("entry_fill" if fill is not None else "entry_working", s, contract=local,
                           dir=op["dir"], qty=QTY, bar_time=iso(t0ts), engine_px=op["entry"],

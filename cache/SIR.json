@@ -1,0 +1,23 @@
+{
+ "conId": 751357027,
+ "local": "SIRZ6",
+ "exchange": "CME",
+ "currency": "USD",
+ "skipped": [
+  "SIRM6 (0 ovl, 0 after)",
+  "SIRZ6 (0 ovl, 0 after)",
+  "ACTIVE SIRZ6 contributed no bars"
+ ],
+ "roll_date": "2026-12-22",
+ "vendor_end": "2026-09-08 15:00",
+ "splice": [
+  {
+   "contract": "SIRU6",
+   "ratio": 1.0,
+   "overlap": 82,
+   "off": 0.0,
+   "bars": 172
+  }
+ ],
+ "rolls": []
+}

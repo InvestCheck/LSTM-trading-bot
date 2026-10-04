@@ -1,0 +1,28 @@
+{
+ "conId": 675565687,
+ "local": "CTZ6",
+ "exchange": "NYBOT",
+ "currency": "USD",
+ "skipped": [
+  "CTN6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 14:00",
+ "splice": [
+  {
+   "contract": "CTV6",
+   "ratio": 1.0,
+   "overlap": 34,
+   "off": 0.0,
+   "bars": 142
+  },
+  {
+   "contract": "CTZ6",
+   "ratio": 1.046338383838384,
+   "overlap": 55,
+   "off": 0.364,
+   "bars": 126
+  }
+ ],
+ "rolls": []
+}

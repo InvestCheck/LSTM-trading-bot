@@ -1,0 +1,26 @@
+{
+ "conId": 674627734,
+ "local": "PAZ6",
+ "exchange": "NYMEX",
+ "currency": "USD",
+ "skipped": [],
+ "roll_date": "2026-11-23",
+ "vendor_end": "2026-09-08 18:00",
+ "splice": [
+  {
+   "contract": "PAU6",
+   "ratio": 0.9950936043257295,
+   "overlap": 18,
+   "off": 0.056,
+   "bars": 0
+  },
+  {
+   "contract": "PAZ6",
+   "ratio": 1.0049305870854182,
+   "overlap": 113,
+   "off": 0.0,
+   "bars": 413
+  }
+ ],
+ "rolls": []
+}

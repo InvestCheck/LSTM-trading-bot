@@ -1,0 +1,28 @@
+{
+ "conId": 694583788,
+ "local": "SBH7",
+ "exchange": "NYBOT",
+ "currency": "USD",
+ "skipped": [
+  "SBN6 (0 ovl, 0 after)"
+ ],
+ "roll_date": "2027-02-19",
+ "vendor_end": "2026-09-08 12:00",
+ "splice": [
+  {
+   "contract": "SBV6",
+   "ratio": 1.0,
+   "overlap": 36,
+   "off": 0.0,
+   "bars": 110
+  },
+  {
+   "contract": "SBH7",
+   "ratio": 1.052178916238018,
+   "overlap": 50,
+   "off": 0.0,
+   "bars": 70
+  }
+ ],
+ "rolls": []
+}
