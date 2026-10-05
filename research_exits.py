@@ -68,13 +68,14 @@ Z_CRIT = NormalDist().inv_cdf(1 - 0.05 / N_TESTS)
 # 1. Harvest: run()'s entry detection with the position manager removed
 # ----------------------------------------------------------------------------
 def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002,
-            SPANDAYS=7, K=3, MINTOUCH=3, TGAP=6, start_ts=None):
+            SPANDAYS=7, K=3, MINTOUCH=3, TGAP=6, start_ts=None, fill="intrabar"):
+    nextbar = (fill == "next")
     T, O, H, L, C = load_series(path); n = len(C)
     e21 = ema(C, 21); e200 = ema(C, 200); A = atr(H, L, C, 14)
     PH, PL = pivots(H, L, K)
     start = int(np.searchsorted(T, start_ts)) if start_ts else 0
     sh = []; rh = []; ih = 0; il = 0
-    sigs = []; traded = set()
+    sigs = []
 
     def sl_low(i, j): return (L[j] - L[i]) / (j - i)
     def sl_high(i, j): return (H[j] - H[i]) / (j - i)
@@ -131,10 +132,9 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
             rh.append(p); ih += 1
         if t < start: continue
 
-        sig = None
+        order = 0
         for i in range(1, len(sh)):
             a, b = sh[i - 1], sh[i]
-            if (a, b, 's') in traded: continue
             m = sl_low(a, b)
             if m <= 0 or (t - a) < MINSPAN or (t - a) > MAXSPAN: continue
             lt = L[a] + m * (t - a); lp = L[a] + m * (t - 1 - a)
@@ -145,7 +145,11 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
             if rf is None: continue
             a2, m2, last2, tch = rf
             lt = L[a2] + m2 * (t - a2)
-            entry = O[t] if O[t] < lt else lt
+            if nextbar:
+                if t + 1 >= n: continue
+                entry = O[t + 1]
+            else:
+                entry = O[t] if O[t] < lt else lt
             floor = 1.0 * A[t]
             cands = []
             for j in range(1, len(rh)):
@@ -156,13 +160,12 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
             elif e200[t] > entry + floor: stop = float(e200[t]); stop_src = 'ema'
             else: continue
             if stop - entry <= 0: continue
-            sig = dict(dir=-1, t0=int(t), entry=float(entry), stop0=float(stop), a=int(a2),
-                       kind='sup', touches=len(tch), stop_src=stop_src)
-            traded.add((a, b, 's')); break
-        if sig is None:
+            sigs.append(dict(dir=-1, t0=int(t), entry=float(entry), stop0=float(stop), a=int(a2),
+                             kind='sup', touches=len(tch), stop_src=stop_src, edge=(int(a), int(b), 's'),
+                             order=order)); order += 1
+        if True:
             for i in range(1, len(rh)):
                 a, b = rh[i - 1], rh[i]
-                if (a, b, 'r') in traded: continue
                 m = sl_high(a, b)
                 if m >= 0 or (t - a) < MINSPAN or (t - a) > MAXSPAN: continue
                 lt = H[a] + m * (t - a); lp = H[a] + m * (t - 1 - a)
@@ -173,7 +176,11 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
                 if rf is None: continue
                 a2, m2, last2, tch = rf
                 lt = H[a2] + m2 * (t - a2)
-                entry = O[t] if O[t] > lt else lt
+                if nextbar:
+                    if t + 1 >= n: continue
+                    entry = O[t + 1]
+                else:
+                    entry = O[t] if O[t] > lt else lt
                 floor = 1.0 * A[t]
                 cands = []
                 for j in range(1, len(sh)):
@@ -184,10 +191,9 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
                 elif e200[t] < entry - floor: stop = float(e200[t]); stop_src = 'ema'
                 else: continue
                 if entry - stop <= 0: continue
-                sig = dict(dir=1, t0=int(t), entry=float(entry), stop0=float(stop), a=int(a2),
-                           kind='res', touches=len(tch), stop_src=stop_src)
-                traded.add((a, b, 'r')); break
-        if sig: sigs.append(sig)
+                sigs.append(dict(dir=1, t0=int(t), entry=float(entry), stop0=float(stop), a=int(a2),
+                                 kind='res', touches=len(tch), stop_src=stop_src, edge=(int(a), int(b), 'r'),
+                                 order=order)); order += 1
     return dict(T=T, O=O, H=H, L=L, C=C, e21=e21, e50=ema(C, 50), e200=e200, A=A), sigs
 
 
@@ -294,25 +300,29 @@ def exit_time(D, s, nbars=48):
 
 
 def exit_fade(D, s):
-    """Trade AGAINST the break. Stop 0.5 ATR beyond the parabolic band, trailing
-    with the band; target the 21 EMA; 96 bar time stop. Returns R in the fade's
-    own risk units plus (exit_idx, why)."""
-    H, L, C, e21, A = D["H"], D["L"], D["C"], D["e21"], D["A"]
-    t0, d0, entry = s["t0"], s["dir"], s["entry"]
-    d = -d0
-    band0 = e21[t0] + 3.5 * A[t0] if d0 > 0 else e21[t0] - 3.5 * A[t0]
-    stt = band0 + 0.5 * A[t0] if d < 0 else band0 - 0.5 * A[t0]
-    R = abs(entry - stt)
-    if R <= 0: return None
+    """Trade AGAINST the break, entered at the next bar's open (after seeing the
+    close that showed no room). Stop 0.5 ATR beyond BOTH the entry bar's extreme
+    and the parabolic band, trailing with the band but never below breakeven;
+    target the 21 EMA; 96 bar time stop. Returns (exit_idx, R, why) or None."""
+    O, H, L, C, e21, A = D["O"], D["H"], D["L"], D["C"], D["e21"], D["A"]
+    t0, d0 = s["t0"], s["dir"]
+    if t0 + 1 >= len(C): return None
+    d = -d0; a = A[t0]; entry = O[t0 + 1]
+    if d0 > 0:
+        band0 = e21[t0] + 3.5 * a; stt = max(H[t0], band0) + 0.5 * a
+    else:
+        band0 = e21[t0] - 3.5 * a; stt = min(L[t0], band0) - 0.5 * a
+    R = abs(stt - entry)
+    if R < 0.1 * a: return None
     for t in range(t0 + 1, min(len(C), t0 + 97)):
         if d < 0:
             if H[t] >= stt: return t, (stt - entry) / R * d, 'stop'
             if L[t] <= e21[t]: return t, (e21[t] - entry) / R * d, 'target'
-            stt = min(stt, e21[t] + 4.0 * A[t])
+            stt = max(min(stt, e21[t] + 4.0 * A[t]), entry)
         else:
             if L[t] <= stt: return t, (stt - entry) / R * d, 'stop'
             if H[t] >= e21[t]: return t, (e21[t] - entry) / R * d, 'target'
-            stt = max(stt, e21[t] - 4.0 * A[t])
+            stt = min(max(stt, e21[t] - 4.0 * A[t]), entry)
         if t == t0 + 96: return t, (C[t] - entry) / R * d, 'time'
     return len(C) - 1, (C[-1] - entry) / R * d, 'eod'
 
@@ -377,10 +387,20 @@ def main():
     args = sys.argv[1:]
     if not args: sys.exit("usage: python3 research_exits.py DATA_DIR [--symbols ...]")
     data_dir = args[0]
+    fill = args[args.index("--fill") + 1] if "--fill" in args else "intrabar"
+    if fill not in ("intrabar", "next"): sys.exit("--fill must be intrabar or next")
+    global OUT
+    OUT = os.path.join("research", fill)
     syms = list(UNIVERSE)
-    if "--symbols" in args: syms = [a for a in args[args.index("--symbols") + 1:] if not a.startswith("--")]
+    if "--symbols" in args:
+        syms = []
+        for a in args[args.index("--symbols") + 1:]:
+            if a.startswith("--"): break
+            syms.append(a)
     cat = build_catalog(data_dir)
     os.makedirs(OUT, exist_ok=True)
+    print(f"fill mode: {fill}  (intrabar = the protocol's scored engine; next = entry at the next bar's "
+          f"open, which is what the live bot actually does)")
     print(f"preregistered: {len(EXITS) - 1} exit comparisons, {len(FILTERS)} filters, "
           f"{len(FADE_THRESHOLDS)} fade thresholds = {N_TESTS} tests; one sided z threshold {Z_CRIT:.2f}\n")
 
@@ -390,44 +410,59 @@ def main():
         tick = TICKS.get(s, 0.0)
         T = load_series(cat[s])[0]
         start_ts = int(T.min()) + WARMUP_DAYS * 86400
-        D, sigs = harvest(cat[s], start_ts=start_ts)
+        D, sigs = harvest(cat[s], start_ts=start_ts, fill=fill)
         D["hi1"] = rolling_extreme(D["H"], 5800, True); D["lo1"] = rolling_extreme(D["L"], 5800, False)
         D["hi5"] = rolling_extreme(D["H"], 29000, True); D["lo5"] = rolling_extreme(D["L"], 29000, False)
-        # engine reference, for the self check
-        _, eng, _, _ = run(s, cat[s], 1.0, start_ts, CAP=1e12, MINSPAN=MINSPAN, MAXSPAN=MAXSPAN,
-                           fill="intrabar", causal=True)
+        # engine reference, for the self check (intrabar only: the engine's own fill='next' also
+        # changes the trigger to the legacy break through rule, which is not the live bot's model)
+        if fill == "intrabar":
+            _, eng, _, _ = run(s, cat[s], 1.0, start_ts, CAP=1e12, MINSPAN=MINSPAN, MAXSPAN=MAXSPAN,
+                               fill="intrabar", causal=True)
+        else:
+            eng = []
         eng_keys = {(x["t0"], x["dir"]): x for x in eng}
         # every variant: one position per instrument, same rule as the engine
         per_sig = {id(sg): dict(sg) for sg in sigs}
-        for name in EXITS:
-            busy = -1
-            for sg in sigs:
-                row = per_sig[id(sg)]
-                if sg["t0"] < busy:
-                    row[f"R_{name}"] = ""; row[f"why_{name}"] = "skipped"; continue
-                ei, ex, why, mfe = run_variant(name, D, sg)
-                r = r_of(sg, ex, why, mfe, name)
-                cost = (2.0 * tick) / abs(sg["entry"] - sg["stop0"]) if tick else 0.0
-                row[f"R_{name}"] = round(r - cost, 6); row[f"why_{name}"] = why
-                if name == "engine":
-                    row["mfe"] = round(mfe, 4); row["exit_idx"] = ei; row["gross_engine"] = round(r, 6)
-                busy = ei
-        fades = {}
         for sg in sigs:
-            fr = exit_fade(D, sg)
-            per_sig[id(sg)]["R_fade"] = round(fr[1], 6) if fr else ""
-            per_sig[id(sg)]["why_fade"] = fr[2] if fr else "nostop"
+            for name in EXITS:
+                per_sig[id(sg)][f"R_{name}"] = ""; per_sig[id(sg)][f"why_{name}"] = "skipped"
+        by_bar = defaultdict(list)
+        for sg in sigs: by_bar[sg["t0"]].append(sg)
+        bars = sorted(by_bar)
+        for name in EXITS:
+            # exactly the engine's rule: when flat, take the first candidate on the bar whose
+            # line has not been traded before; a line only counts as traded when it is taken
+            busy, taken = -1, set()
+            for t in bars:
+                if t < busy: continue
+                for sg in sorted(by_bar[t], key=lambda x: x["order"]):
+                    if sg["edge"] in taken: continue
+                    taken.add(sg["edge"])
+                    row = per_sig[id(sg)]
+                    ei, ex, why, mfe = run_variant(name, D, sg)
+                    r = r_of(sg, ex, why, mfe, name)
+                    cost = (2.0 * tick) / abs(sg["entry"] - sg["stop0"]) if tick else 0.0
+                    row[f"R_{name}"] = round(r - cost, 6); row[f"why_{name}"] = why
+                    if name == "engine":
+                        row["mfe"] = round(mfe, 4); row["exit_idx"] = ei; row["gross_engine"] = round(r, 6)
+                    busy = ei
+                    break
+        for sg in sigs:
+            row = per_sig[id(sg)]
+            fr = exit_fade(D, sg) if row["why_engine"] != "skipped" else None
+            row["R_fade"] = round(fr[1], 6) if fr else ""
+            row["why_fade"] = fr[2] if fr else ("nostop" if row["why_engine"] != "skipped" else "skipped")
         for sg in sigs:
             row = per_sig[id(sg)]
             row.update(symbol=s, entry_time=iso(D["T"][sg["t0"]]), span=sg["t0"] - sg["a"],
                        quarter=quarter(D["T"][sg["t0"]]), **features(D, sg))
-            k = (sg["t0"], sg["dir"])
-            if k in eng_keys:
-                engine_check["engine_trades"] += 1
-                if row["why_engine"] != "skipped" and abs(row["gross_engine"] - eng_keys[k]["R"]) < 1e-4:
-                    engine_check["reproduced"] += 1
             rows.append(row)
-        print(f"{s:5s} {len(sigs):5d} signals, engine took {len(eng):5d}")
+        took = {(r["t0"], r["dir"]): r for r in rows if r["symbol"] == s and r["why_engine"] != "skipped"}
+        engine_check["engine_trades"] += len(eng)
+        engine_check["reproduced"] += sum(1 for k, x in eng_keys.items()
+                                          if k in took and abs(took[k]["gross_engine"] - x["R"]) < 1e-4)
+        print(f"{s:5s} {len(sigs):5d} candidates, harness took {len(took):5d}"
+              + (f", engine took {len(eng):5d}" if fill == "intrabar" else ""))
 
     # ---- write per signal table
     cols = ["symbol", "entry_time", "dir", "kind", "touches", "span", "stop_src", "entry", "stop0", "risk_atr",
@@ -438,9 +473,18 @@ def main():
 
     # ---- report
     L = []
-    L.append("# Exit, filter and band fade study on the frozen engine's entries\n")
-    L.append(f"Harvested signals: {len(rows)}. Engine trades reproduced from the harvest: "
-             f"{engine_check['reproduced']}/{engine_check['engine_trades']}.\n")
+    L.append(f"# Exit, filter and band fade study on the frozen engine's entries (fill = {fill})\n")
+    L.append("Entry bar features (EMA distances, momentum, room) are measured at the entry bar's close. "
+             + ("With intrabar fills that close comes AFTER the fill, so those filters contain lookahead "
+                "and are for reference only; the `next` fill run is the decision basis.\n"
+                if fill == "intrabar" else
+                "With next bar fills the close is known before the fill, so the filters are usable live.\n"))
+    if fill == "intrabar":
+        L.append(f"Harvested candidates: {len(rows)}. Engine trades reproduced exactly by the harness: "
+                 f"{engine_check['reproduced']}/{engine_check['engine_trades']}.\n")
+    else:
+        L.append(f"Harvested candidates: {len(rows)}. Trigger: intrabar touch (as the live bot runs it), "
+                 f"fill: next bar open. The harvest is validated by the intrabar run's self check.\n")
     L.append(f"Preregistered tests: {N_TESTS}. One sided Bonferroni threshold on the bootstrap t: **{Z_CRIT:.2f}**. "
              f"Costs: 2 ticks per round trip. Bootstrap: {BOOT_REPS} resamples of calendar quarters.\n")
 
