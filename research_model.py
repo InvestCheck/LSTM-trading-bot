@@ -87,10 +87,14 @@ def block_diff(vals, keep, quarters, reps=BOOT_REPS, seed=SEED):
 def main():
     rows = load()
     expl = [r for r in rows if r["year"] < SPLIT_YEAR]; hold = [r for r in rows if r["year"] >= SPLIT_YEAR]
-    Xe = np.array([featurize(r) for r in expl]); ye = np.array([r["net"] for r in expl])
-    Xh = np.array([featurize(r) for r in hold]); yh = np.array([r["net"] for r in hold])
+    Xe = np.array([featurize(r) for r in expl], float); ye = np.array([r["net"] for r in expl])
+    Xh = np.array([featurize(r) for r in hold], float); yh = np.array([r["net"] for r in hold])
+    Xe[~np.isfinite(Xe)] = 0.0; Xh[~np.isfinite(Xh)] = 0.0
+    # winsorize at the exploration 1st/99th percentiles so one bad ATR cannot steer the fit
+    lo, hi = np.percentile(Xe, 1, axis=0), np.percentile(Xe, 99, axis=0)
+    Xe = np.clip(Xe, lo, hi); Xh = np.clip(Xh, lo, hi)
     mu, sd = Xe.mean(0), Xe.std(0) + 1e-9
-    Ze = (Xe - mu) / sd; Zh = (Xh - mu) / sd
+    Ze = np.clip((Xe - mu) / sd, -5, 5); Zh = np.clip((Xh - mu) / sd, -5, 5)
     Ze1 = np.hstack([Ze, np.ones((len(Ze), 1))]); Zh1 = np.hstack([Zh, np.ones((len(Zh), 1))])
     reg = RIDGE * np.eye(Ze1.shape[1]); reg[-1, -1] = 0
     w = np.linalg.solve(Ze1.T @ Ze1 + reg, Ze1.T @ ye)
@@ -119,9 +123,11 @@ def main():
     # freeze the model: everything needed to score a new signal, fit on 2008 to 2016 only
     import json
     json.dump(dict(fit_years=f"2008-{SPLIT_YEAR - 1}", ridge=RIDGE, names=NAMES, mu=mu.tolist(), sd=sd.tolist(),
+                   clip_lo=lo.tolist(), clip_hi=hi.tolist(), z_clip=5.0,
                    weights=w[:-1].tolist(), intercept=float(w[-1]), cutoff=cut,
                    holdout=dict(n=len(hold), diff=float(d), t=float(t), verdict=verdict),
-                   note="score = intercept + sum(w * (x - mu) / sd); top tier if score >= cutoff"),
+                   note="x -> non finite to 0, clip to [clip_lo, clip_hi], z = clip((x - mu) / sd, -5, 5); "
+                        "score = intercept + sum(w * z); top tier if score >= cutoff"),
               open("research/tier_model.json", "w"), indent=1)
     print("-> research/tier_model.json (frozen fit)")
 
