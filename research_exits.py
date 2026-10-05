@@ -316,15 +316,15 @@ def exit_fade(D, s):
     if R < 0.1 * a: return None
     for t in range(t0 + 1, min(len(C), t0 + 97)):
         if d < 0:
-            if H[t] >= stt: return t, (stt - entry) / R * d, 'stop'
-            if L[t] <= e21[t]: return t, (e21[t] - entry) / R * d, 'target'
+            if H[t] >= stt: return t, (stt - entry) / R * d, 'stop', R
+            if L[t] <= e21[t]: return t, (e21[t] - entry) / R * d, 'target', R
             stt = max(min(stt, e21[t] + 4.0 * A[t]), entry)
         else:
-            if L[t] <= stt: return t, (stt - entry) / R * d, 'stop'
-            if H[t] >= e21[t]: return t, (e21[t] - entry) / R * d, 'target'
+            if L[t] <= stt: return t, (stt - entry) / R * d, 'stop', R
+            if H[t] >= e21[t]: return t, (e21[t] - entry) / R * d, 'target', R
             stt = min(max(stt, e21[t] - 4.0 * A[t]), entry)
-        if t == t0 + 96: return t, (C[t] - entry) / R * d, 'time'
-    return len(C) - 1, (C[-1] - entry) / R * d, 'eod'
+        if t == t0 + 96: return t, (C[t] - entry) / R * d, 'time', R
+    return len(C) - 1, (C[-1] - entry) / R * d, 'eod', R
 
 
 def run_variant(name, D, s):
@@ -447,11 +447,19 @@ def main():
                         row["mfe"] = round(mfe, 4); row["exit_idx"] = ei; row["gross_engine"] = round(r, 6)
                     busy = ei
                     break
-        for sg in sigs:
+        # band fade: only on signals the engine took, costs charged, one fade at a time per instrument
+        fade_busy = -1
+        for sg in sorted(sigs, key=lambda x: (x["t0"], x["order"])):
             row = per_sig[id(sg)]
-            fr = exit_fade(D, sg) if row["why_engine"] != "skipped" else None
-            row["R_fade"] = round(fr[1], 6) if fr else ""
-            row["why_fade"] = fr[2] if fr else ("nostop" if row["why_engine"] != "skipped" else "skipped")
+            row["R_fade"], row["why_fade"] = "", "skipped"
+            if row["why_engine"] == "skipped" or sg["t0"] < fade_busy: continue
+            fr = exit_fade(D, sg)
+            if not fr:
+                row["why_fade"] = "nostop"; continue
+            ei, r, why, Rden = fr
+            cost = (2.0 * tick) / Rden if tick else 0.0
+            row["R_fade"] = round(r - cost, 6); row["why_fade"] = why
+            fade_busy = ei
         for sg in sigs:
             row = per_sig[id(sg)]
             row.update(symbol=s, entry_time=iso(D["T"][sg["t0"]]), span=sg["t0"] - sg["a"],
@@ -533,7 +541,8 @@ def main():
         L.append(f"| {fname} | {feat} {op} {val} | {si['n']}, {si['avgR']:+.4f}, {si['win']:.0f}% | "
                  f"{so['n']}, {so['avgR']:+.4f}, {so['win']:.0f}% | {diff:+.4f} | {tdiff:.2f} | {verdict} |")
 
-    L.append("\n## Band fade (trade against breaks that fire with little room to the band)\n")
+    L.append("\n## Band fade (trade against breaks that fire with little room to the band; "
+             "2 tick cost charged, one fade at a time per instrument)\n")
     L.append("| room threshold | fade trades | avgR | win% | PF | boot t | verdict | (engine avgR on same signals) |")
     L.append("|---|---|---|---|---|---|---|---|")
     for th in FADE_THRESHOLDS:
