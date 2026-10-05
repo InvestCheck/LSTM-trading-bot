@@ -245,6 +245,17 @@ def features(D, s):
         dow=datetime.fromtimestamp(int(D["T"][t]), timezone.utc).weekday(),
         risk_atr=abs(entry - s["stop0"]) / a,
     )
+    # the same measures on the bar BEFORE entry: known when a resting order is placed
+    p = max(0, t - 1); ap = A[p] if A[p] > 0 else 1e-12
+    bandp = e21[p] + 3.5 * ap if d > 0 else e21[p] - 3.5 * ap
+    f.update(
+        p_d_e21=d * (C[p] - e21[p]) / ap, p_d_e50=d * (C[p] - e50[p]) / ap, p_d_e200=d * (C[p] - e200[p]) / ap,
+        p_room=d * (bandp - entry) / ap,
+        p_mom5=d * (C[p] - C[max(0, p - 5)]) / ap, p_mom20=d * (C[p] - C[max(0, p - 20)]) / ap,
+        p_ext_1y=((entry - D["hi1"][p]) if d > 0 else (D["lo1"][p] - entry)) / ap,
+        p_atr_ratio=ap / max(1e-12, float(np.mean(A[max(0, p - 500):p]))) if p > 50 else 1.0,
+        p_risk_atr=abs(entry - s["stop0"]) / ap,
+    )
     return {k: (round(v, 4) if isinstance(v, float) else v) for k, v in f.items()}
 
 
@@ -521,6 +532,7 @@ def main():
     # ---- write per signal table
     cols = ["symbol", "entry_time", "dir", "kind", "touches", "span", "stop_src", "entry", "stop0", "risk_atr",
             "d_e21", "d_e50", "d_e200", "room", "mom5", "mom20", "ext_1y", "ext_5y", "atr_ratio", "hour", "dow",
+            "p_d_e21", "p_d_e50", "p_d_e200", "p_room", "p_mom5", "p_mom20", "p_ext_1y", "p_atr_ratio", "p_risk_atr",
             "mfe", "gross_engine"] + [f"R_{e}" for e in EXITS] + [f"why_{e}" for e in EXITS] + ["R_fade", "why_fade", "quarter"]
     with open(os.path.join(OUT, "signals.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore"); w.writeheader(); w.writerows(rows)
