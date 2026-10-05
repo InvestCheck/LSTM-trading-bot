@@ -81,11 +81,15 @@ from backtest_hull import run, load_series
 from batch_backtest import build_catalog, iso
 from ib_contracts import IB as MAP, UNIVERSE, pick_active, contract_rows
 from entry_scan import scan, taken_edges, next_bar_orders
+TIER = None                                      # protocol v2 gate, loaded in main()
 
 # ----------------------------------------------------------------------------
 # Config (frozen; see protocol)
 # ----------------------------------------------------------------------------
 MODE = os.environ.get("MODE", "shadow")          # shadow | paper
+PROTOCOL = os.environ.get("PROTOCOL", "v2")      # v1: execute every signal. v2: execute only signals that pass the
+                                                 # tier cut and cost cap (protocol_v2.md); v1's full signal set is
+                                                 # still logged and scored on engine prices from the same run.
 EXEC = os.environ.get("EXEC", "resting")         # resting: stop orders at the line, confirmed or scratched at the
                                                  # close (fills at the line like the backtest). market: enter at the
                                                  # next open after the engine signals (loses ~0.07R/trade, research)
@@ -605,6 +609,28 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc):
     closed = {(int(T[x["t0"]]), x["dir"]): x for x in trades}
     paper = MODE == "paper" and broker is not None
 
+    # ---- v1 record: every engine trade, executed or not, logged once when the engine closes it.
+    # One position at a time per instrument means exits are in time order, so a watermark suffices.
+    wm = state.setdefault("engine_logged_through", {})
+    executed = state.setdefault("executed", {}).setdefault(s, [])
+    if P and P.get("entry_ts") not in executed:
+        executed.append(P["entry_ts"])
+    if trades:
+        newest = max(int(T[x["exit_idx"]]) for x in trades)
+        if s not in wm:
+            wm[s] = newest                       # first pass: history is not forward data
+        else:
+            for x in sorted(trades, key=lambda x: x["exit_idx"]):
+                xt = int(T[x["exit_idx"]])
+                if xt <= wm[s]: continue
+                et = int(T[x["t0"]])
+                log_trade("engine_trade", s, contract=local, dir=x["dir"], bar_time=iso(et),
+                          engine_px=x["entry"], stop=x["stop0"], R_px=abs(x["entry"] - x["stop0"]),
+                          R_engine=x["R"], why=x["why"],
+                          note=f"exit {iso(xt)} at {x['exit']:.6g}; v1 scored set; "
+                               + ("executed" if et in executed else "not executed"))
+            wm[s] = newest
+
     # ---- 0. pick up fills still pending from an earlier pass -------------
     if P and paper and P.get("fill") is None and P.get("entry_order_id"):
         fill = broker.fill_of(P["entry_order_id"])
@@ -802,7 +828,8 @@ def settle_resting(s, state, broker, st, T, op, details, tick):
             log_trade("confirm", s, contract=local, dir=d, qty=o["qty"], bar_time=iso(last_ts),
                       engine_px=op["entry"], actual_px=fill, stop=op["stop0"], R_px=op["R"],
                       why=f"{op['kind']} line; {len(op['tch'])} touches; stop {op['stop_src']}",
-                      note="fill vs engine " + f"{(fill - op['entry']) * d / op['R']:+.3f}R")
+                      note="fill vs engine " + f"{(fill - op['entry']) * d / op['R']:+.3f}R"
+                           + (f"; tier {o['score']:+.3f}" if o.get("score") is not None else ""))
         else:
             exit_px, oid, note = None, None, ""
             if stop_hit is not None:
@@ -834,18 +861,29 @@ def place_resting(s, state, broker, st, taken, op, details, tick):
     c = details.contract if details else None
     oc = broker.order_contract(c.conId, c.exchange, c.currency) if (c and broker) else None
     oca = f"{s}-{last_ts}"
-    placed = []
+    placed, skipped = [], []
     for d, o in orders.items():
+        score, gate_note = None, ""
+        if PROTOCOL == "v2" and TIER is not None:
+            ok, score, gate_note = TIER.allows(s, st, o, last_ts + 3600)
+            if not ok:
+                skipped.append(f"{'short' if d < 0 else 'long'} @{o['trigger']:.6g} v2 skip: {gate_note}")
+                continue
         trigger = round_trigger(o["trigger"], tick, d)
         spx = round_stop(o["stop"], tick, d)
         rec = dict(dir=d, trigger=trigger, stop=spx, edge=list(o["edge"]), line_level=o["line_level"],
-                   refit_level=o["refit_level"], qty=QTY, placed_after=last_ts, entry_order_id=None, stop_order_id=None)
+                   refit_level=o["refit_level"], qty=QTY, placed_after=last_ts, entry_order_id=None,
+                   stop_order_id=None, score=score)
         if paper:
             rec["entry_order_id"], rec["stop_order_id"] = broker.place_resting(oc, d, QTY, trigger, spx, oca)
         placed.append(rec)
-    state["resting"][s] = placed
-    log_event(f"rest {s:5s} " + "  ".join(f"{'short' if r['dir'] < 0 else 'long'} @{r['trigger']:.6g} stop {r['stop']:.6g}"
-                                          for r in placed))
+    if placed:
+        state["resting"][s] = placed
+    msg = "  ".join(f"{'short' if r['dir'] < 0 else 'long'} @{r['trigger']:.6g} stop {r['stop']:.6g}"
+                    + (f" score {r['score']:+.3f}" if r.get("score") is not None else "") for r in placed)
+    if skipped:
+        msg += ("  | " if msg else "") + "  ".join(skipped)
+    log_event(f"rest {s:5s} " + msg)
 
 
 # ----------------------------------------------------------------------------
@@ -937,6 +975,12 @@ def main():
     if MODE not in ("shadow", "paper"):
         sys.exit(f"MODE must be shadow or paper, got {MODE!r}; there is no live mode")
     catalog = build_catalog(DATA_DIR)
+    global TIER
+    if PROTOCOL == "v2":
+        from tier import Tier
+        TIER = Tier()
+        log_event(f"protocol v2: tier cutoff {TIER.cutoff:+.4f} (fit {TIER.fit_years}), cost cap {TIER.cost_cap}R, "
+                  f"{len(TIER.cheap)} instruments pass the cap")
 
     if "--replay" in args:
         return replay(int(args[args.index("--replay") + 1]), args[args.index("--replay") + 2], catalog)
@@ -945,7 +989,7 @@ def main():
     broker = Broker()
     if not broker.connect():
         sys.exit("could not connect to IBKR Gateway")
-    log_event(f"forward test runner: {MODE} mode, {len(syms)} symbols, data from {DATA_DIR}")
+    log_event(f"forward test runner: {MODE} mode, {EXEC} execution, protocol {PROTOCOL}, {len(syms)} symbols, data from {DATA_DIR}")
     if "--once" in args:
         run_pass(broker, state, catalog, syms)
         broker.ib.disconnect()
