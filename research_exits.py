@@ -75,7 +75,7 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
     PH, PL = pivots(H, L, K)
     start = int(np.searchsorted(T, start_ts)) if start_ts else 0
     sh = []; rh = []; ih = 0; il = 0
-    sigs = []
+    sigs = []; touches = []
 
     def sl_low(i, j): return (L[j] - L[i]) / (j - i)
     def sl_high(i, j): return (H[j] - H[i]) / (j - i)
@@ -85,7 +85,7 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
             if not out or z - out[-1] >= TGAP: out.append(int(z))
         return out
 
-    def refit(piv, arr, sign, a, m, t, hv):
+    def refit(piv, arr, sign, a, m, t, hv, check_break=True):
         cand = []
         for p in piv:
             if p < a or p > t: continue
@@ -107,10 +107,11 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
                 if (sign > 0 and np.any(L[p1:t] < lnz - brk_tol * L[p1:t])) or \
                    (sign < 0 and np.any(H[p1:t] > lnz + brk_tol * H[p1:t])): continue
                 lnt = arr[p1] + s * (t - p1); lnp = arr[p1] + s * (t - 1 - p1)
-                if sign > 0:
-                    if not (L[t] <= lnt and L[t - 1] > lnp): continue
-                else:
-                    if not (H[t] >= lnt and H[t - 1] < lnp): continue
+                if check_break:
+                    if sign > 0:
+                        if not (L[t] <= lnt and L[t - 1] > lnp): continue
+                    else:
+                        if not (H[t] >= lnt and H[t - 1] < lnp): continue
                 g = (arr[p1:t] - lnz) if sign > 0 else (lnz - arr[p1:t])
                 mask = (g >= -brk_tol * arr[p1:t]) & (g <= touch_band * arr[p1:t])
                 tt = sepidx([int(z) for z in zz[mask]])
@@ -141,6 +142,15 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
             if not (L[t] <= lt and L[t - 1] > lp): continue
             zz = np.arange(a, t)
             if np.any(L[a:t] < L[a] + m * (zz - a) - tol * L[a:t]): continue
+            # a resting sell stop at lt would have filled here (at the open if it gapped through)
+            pre = refit(PL, L, 1, a, m, t, set(sh), check_break=False)
+            preok = False
+            if pre is not None:
+                lvl = L[pre[0]] + pre[1] * (t - pre[0]); fl = 1.0 * A[t - 1]
+                preok = any((H[rh[j - 1]] + (H[rh[j]] - H[rh[j - 1]]) / (rh[j] - rh[j - 1]) * (t - rh[j - 1])) > lvl + fl
+                            and rh[j] >= t - 720 and rh[j - 1] >= t - 2880 for j in range(1, len(rh))) \
+                        or e200[t - 1] > lvl + fl
+            touches.append(dict(t=int(t), dir=-1, fill=float(O[t] if O[t] < lt else lt), order=order, pre=preok))
             rf = refit(PL, L, 1, a, m, t, set(sh))
             if rf is None: continue
             a2, m2, last2, tch = rf
@@ -172,6 +182,14 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
                 if not (H[t] >= lt and H[t - 1] < lp): continue
                 zz = np.arange(a, t)
                 if np.any(H[a:t] > H[a] + m * (zz - a) + tol * H[a:t]): continue
+                pre = refit(PH, H, -1, a, m, t, set(rh), check_break=False)
+                preok = False
+                if pre is not None:
+                    lvl = H[pre[0]] + pre[1] * (t - pre[0]); fl = 1.0 * A[t - 1]
+                    preok = any((L[sh[j - 1]] + (L[sh[j]] - L[sh[j - 1]]) / (sh[j] - sh[j - 1]) * (t - sh[j - 1])) < lvl - fl
+                                and sh[j] >= t - 720 and sh[j - 1] >= t - 2880 for j in range(1, len(sh))) \
+                            or e200[t - 1] < lvl - fl
+                touches.append(dict(t=int(t), dir=1, fill=float(O[t] if O[t] > lt else lt), order=order, pre=preok))
                 rf = refit(PH, H, -1, a, m, t, set(rh))
                 if rf is None: continue
                 a2, m2, last2, tch = rf
@@ -194,7 +212,7 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
                 sigs.append(dict(dir=1, t0=int(t), entry=float(entry), stop0=float(stop), a=int(a2),
                                  kind='res', touches=len(tch), stop_src=stop_src, edge=(int(a), int(b), 'r'),
                                  order=order)); order += 1
-    return dict(T=T, O=O, H=H, L=L, C=C, e21=e21, e50=ema(C, 50), e200=e200, A=A), sigs
+    return dict(T=T, O=O, H=H, L=L, C=C, e21=e21, e50=ema(C, 50), e200=e200, A=A, touches=touches), sigs
 
 
 # ----------------------------------------------------------------------------
@@ -404,7 +422,7 @@ def main():
     print(f"preregistered: {len(EXITS) - 1} exit comparisons, {len(FILTERS)} filters, "
           f"{len(FADE_THRESHOLDS)} fade thresholds = {N_TESTS} tests; one sided z threshold {Z_CRIT:.2f}\n")
 
-    rows = []; engine_check = dict(engine_trades=0, reproduced=0)
+    rows = []; engine_check = dict(engine_trades=0, reproduced=0); resting = {}
     for s in syms:
         if s not in cat: print(f"{s:5s} missing"); continue
         tick = TICKS.get(s, 0.0)
@@ -460,6 +478,34 @@ def main():
             cost = (2.0 * tick) / Rden if tick else 0.0
             row["R_fade"] = round(r - cost, 6); row["why_fade"] = why
             fade_busy = ei
+        if fill == "intrabar":
+            # Resting order model: at each bar the bot is flat, one stop order per direction at the
+            # first touchable line (OCO), filled at the line. Confirmed touches are the engine's
+            # trades; unconfirmed ones are scratched at that bar's close. Everything in ATR units.
+            taken_bars = {sg["t0"] for sg in sigs if per_sig[id(sg)]["why_engine"] != "skipped"}
+            busy_until = {}
+            for sg in sigs:
+                r = per_sig[id(sg)]
+                if r["why_engine"] != "skipped": busy_until[sg["t0"]] = r["exit_idx"]
+            A, C = D["A"], D["C"]
+            for model in ("naive", "prequalified"):
+                flat_from = -1; conf_atr = []; scr_atr = []; n_touch = n_conf = 0; seen = set()
+                for tc in sorted(D["touches"], key=lambda x: (x["t"], x["order"])):
+                    t = tc["t"]
+                    if model == "prequalified" and not tc["pre"]: continue
+                    if t < flat_from or (t, tc["dir"]) in seen: continue
+                    seen.add((t, tc["dir"])); n_touch += 1
+                    if t in busy_until: flat_from = busy_until[t]
+                    a = A[t] if A[t] > 0 else 1e-12
+                    conf = next((x for x in by_bar.get(t, []) if x["dir"] == tc["dir"]
+                                 and per_sig[id(x)]["why_engine"] != "skipped"), None)
+                    if conf is not None:
+                        n_conf += 1
+                        conf_atr.append(per_sig[id(conf)]["R_engine"] * abs(conf["entry"] - conf["stop0"]) / a)
+                    else:
+                        scr_atr.append(tc["dir"] * (C[t] - tc["fill"]) / a - (2.0 * tick / a if tick else 0.0))
+                resting.setdefault(model, {})[s] = dict(touches=n_touch, confirmed=n_conf,
+                                                         conf_atr=conf_atr, scr_atr=scr_atr)
         for sg in sigs:
             row = per_sig[id(sg)]
             row.update(symbol=s, entry_time=iso(D["T"][sg["t0"]]), span=sg["t0"] - sg["a"],
@@ -555,6 +601,20 @@ def main():
                  f"{np.mean(same):+.4f} on {len(same)} |" if same else
                  f"| room < {th} | {sm['n']} | {sm['avgR']:+.4f} | {sm['win']:.1f} | {sm['PF']:.2f} | {t:.2f} | {verdict} | n/a |")
 
+    if resting:
+        L.append("\n## Resting order model (fill at the line, scratch at that bar's close if the engine does not confirm)\n")
+        L.append("naive = a stop order on every line that could be touched; prequalified = only lines whose refit "
+                 "geometry and stop already pass on data through the previous bar. All P&L in ATR units, net of 2 ticks.\n")
+        L.append("| model | touches | confirmed | confirmed avg (ATR) | scratched avg (ATR) | **per touch (ATR)** | total (ATR) |")
+        L.append("|---|---|---|---|---|---|---|")
+        for model, per in resting.items():
+            tt = sum(v["touches"] for v in per.values()); cc = sum(v["confirmed"] for v in per.values())
+            ca = [x for v in per.values() for x in v["conf_atr"]]; sa = [x for v in per.values() for x in v["scr_atr"]]
+            tot = np.sum(ca) + np.sum(sa)
+            L.append(f"| {model} | {tt} | {cc} ({cc / max(1, tt):.0%}) | {np.mean(ca) if ca else 0:+.4f} | "
+                     f"{np.mean(sa) if sa else 0:+.4f} | {tot / max(1, tt):+.4f} | {tot:+.0f} |")
+        L.append("\nThe confirmed trades are the engine's own trades, scored at the line. A positive per touch "
+                 "number means resting orders recover the intrabar edge after paying for the scratches.\n")
     L.append("\n## Feature summary on the engine's trades (avgR by quartile)\n")
     L.append("| feature | Q1 (low) | Q2 | Q3 | Q4 (high) |")
     L.append("|---|---|---|---|---|")
