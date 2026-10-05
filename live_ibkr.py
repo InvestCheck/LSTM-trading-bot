@@ -40,10 +40,23 @@ roll together, in the same pass.
 Scoring: trade_log.csv is the record. R_engine is the engine's gross R for the
 trade (the scored number, costs applied in post), R_actual is from real fills.
 
+Execution (EXEC)
+----------------
+  resting  at each close, for every line that already passes the engine's refit
+           geometry and has a valid stop on data through that bar, rest a stop
+           order at the level the next bar would have to touch (one per
+           direction, OCA). A fill is at the line. At the next close the engine
+           runs: if it produced that signal the fill is CONFIRMED and the stop
+           becomes the engine's; if not, the position is SCRATCHED at market.
+           Unfilled orders are cancelled and re-placed at the new levels. This
+           is the only execution that keeps the backtest's edge (research).
+  market   legacy: market order after the engine signals at the close.
+
 Modes
 -----
   shadow   full pipeline, logs every decision, places no orders. Run this on
-           the Mac first.
+           the Mac first. In resting execution, fills are simulated against the
+           bar that closed.
   paper    orders on a DU (paper) account. Refuses anything else.
   There is no live mode.
 
@@ -59,6 +72,7 @@ Usage
 Environment: DATA_DIR (vendor files folder, default ./seed), MODE (shadow|paper).
 """
 import os, sys, csv, json, math, time, traceback, statistics as st
+from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 import numpy as np
@@ -66,11 +80,15 @@ import numpy as np
 from backtest_hull import run, load_series
 from batch_backtest import build_catalog, iso
 from ib_contracts import IB as MAP, UNIVERSE, pick_active, contract_rows
+from entry_scan import scan, taken_edges, next_bar_orders
 
 # ----------------------------------------------------------------------------
 # Config (frozen; see protocol)
 # ----------------------------------------------------------------------------
 MODE = os.environ.get("MODE", "shadow")          # shadow | paper
+EXEC = os.environ.get("EXEC", "resting")         # resting: stop orders at the line, confirmed or scratched at the
+                                                 # close (fills at the line like the backtest). market: enter at the
+                                                 # next open after the engine signals (loses ~0.07R/trade, research)
 DATA_DIR = os.environ.get("DATA_DIR", "seed")    # FirstRateData files
 HOST, PORT, CLIENT_ID = "127.0.0.1", 4002, 11
 MINSPAN, MAXSPAN, WARMUP_DAYS = 2160, 17520, 60
@@ -86,6 +104,7 @@ FILL_WAIT_S = 20
 
 ET = ZoneInfo("America/New_York")
 UTC = timezone.utc
+from instruments import TICKS as TICK_FOR_REPLAY     # vendor tick sizes, used only by the offline replay
 
 LOG_FIELDS = ["ts_utc", "event", "symbol", "mode", "dir", "qty", "contract", "bar_time",
               "engine_px", "actual_px", "stop", "R_px", "R_engine", "R_actual", "why",
@@ -350,6 +369,25 @@ class Broker:
         stt = self.ib.placeOrder(contract, so)
         fill = self.wait_fill(et, FILL_WAIT_S)
         return et.order.orderId, stt.order.orderId, fill, et.orderStatus.status
+
+    def place_resting(self, contract, d, qty, trigger, stop_px, oca):
+        """Stop entry at the line with a provisional protective stop attached.
+        Both directions share an OCA group so only one can fill."""
+        from ib_async import StopOrder
+        action, opp = ("BUY", "SELL") if d > 0 else ("SELL", "BUY")
+        e = StopOrder(action, qty, trigger); e.tif = "GTC"; e.outsideRth = True; e.transmit = False
+        e.ocaGroup = oca; e.ocaType = 1
+        et = self.ib.placeOrder(contract, e)
+        so = StopOrder(opp, qty, stop_px); so.tif = "GTC"; so.outsideRth = True
+        so.parentId = et.order.orderId; so.transmit = True
+        stt = self.ib.placeOrder(contract, so)
+        return et.order.orderId, stt.order.orderId
+
+    def order_status(self, order_id):
+        for t in self.ib.trades():
+            if t.order.orderId == order_id:
+                return t.orderStatus.status
+        return None
 
     def place_stop(self, contract, d, qty, stop_px):
         from ib_async import StopOrder
@@ -622,6 +660,10 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc):
             exit_ts = int(T[tr["exit_idx"]])
             late = tr["exit_idx"] < last
             actual, oid, note = None, None, ("late exit, engine closed " + iso(exit_ts)) if late else ""
+            if not paper and P.get("fill") is not None:
+                bc = P.get("broker_closed")
+                actual = bc if bc not in (None, -1) else tr["exit"]
+                note = (note + " shadow: exit at engine price").strip() if bc in (None, -1) else (note + " shadow: provisional stop").strip()
             if paper:
                 if P.get("broker_closed") is not None:
                     actual = P["broker_closed"] if P["broker_closed"] != -1 else None
@@ -644,7 +686,21 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc):
                           note="held trade not found in engine output; manual check needed")
 
     # ---- 2. entries ---------------------------------------------------------
-    if s not in positions and op is not None:
+    if s not in positions and op is not None and EXEC == "resting":
+        t0ts = int(T[op["t0"]])
+        if op["t0"] == last and t0ts not in state["missed"]:
+            # the engine signalled on the bar that closed but no resting order filled: the
+            # line it broke was not in the order set (or the level differed). Not backfilled.
+            state["missed"].append(t0ts)
+            log_trade("missed_fill", s, contract=local, dir=op["dir"], bar_time=iso(t0ts),
+                      engine_px=op["entry"], stop=op["stop0"], R_px=op["R"],
+                      note="engine signal without a resting fill; not backfilled")
+        elif t0ts not in state["missed"] and (last_done is None or t0ts > last_done):
+            state["missed"].append(t0ts)
+            log_trade("missed", s, contract=local, dir=op["dir"], bar_time=iso(t0ts),
+                      engine_px=op["entry"], R_px=op["R"],
+                      note="opened while bot was not running; not backfilled" if last_done else "open at bot start")
+    elif s not in positions and op is not None:
         t0ts = int(T[op["t0"]])
         if op["t0"] == last:
             spx = round_stop(op["stop0"], tick, op["dir"])
@@ -683,14 +739,125 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc):
 
 
 # ----------------------------------------------------------------------------
+# Resting order execution
+# ----------------------------------------------------------------------------
+def round_trigger(px, tick, d):
+    """Stop entry rounded to the tick on the far side of the line, so a fill
+    guarantees the engine's break condition held."""
+    if not tick:
+        return px
+    k = px / tick
+    k = math.floor(k + 1e-9) if d < 0 else math.ceil(k - 1e-9)
+    return round(k * tick, 10)
+
+
+def settle_resting(s, state, broker, st, T, op, details, tick):
+    """Resolve the orders rested at the previous pass against the bar that just
+    closed: filled or not, and if filled, confirmed by the engine or scratched."""
+    orders = state["resting"].pop(s, [])
+    if not orders:
+        return
+    last = len(T) - 1; last_ts = int(T[last])
+    paper = MODE == "paper" and broker is not None
+    c = details.contract if details else None
+    oc = broker.order_contract(c.conId, c.exchange, c.currency) if (c and broker) else None
+    local = c.localSymbol if c else "shadow"
+    O, H, L, C, A = st.O[last], st.H[last], st.L[last], st.C[last], (st.A[last] or 1e-12)
+    for o in orders:
+        d = o["dir"]
+        if last < 1 or int(o.get("placed_after", -1)) != int(T[last - 1]):
+            # more than one bar has closed since this order was placed (a missed pass): the
+            # order was for a bar we did not see close, so it is cancelled and not interpreted
+            if paper: broker.cancel(o["entry_order_id"])
+            log_trade("rest_stale", s, contract=local, dir=d, bar_time=iso(o.get("placed_after", last_ts)),
+                      engine_px=o["trigger"], note="order outlived its bar; cancelled, not interpreted")
+            continue
+        fill, stop_hit = None, None
+        if paper:
+            fill = broker.fill_of(o["entry_order_id"])
+            if fill is not None:
+                stop_hit = broker.fill_of(o["stop_order_id"])
+            else:
+                broker.cancel(o["entry_order_id"])
+        else:
+            touched = (L <= o["trigger"]) if d < 0 else (H >= o["trigger"])
+            if touched:
+                fill = min(O, o["trigger"]) if d < 0 else max(O, o["trigger"])
+                if (d < 0 and H >= o["stop"]) or (d > 0 and L <= o["stop"]):
+                    stop_hit = o["stop"]          # conservative: assume the provisional stop fired
+        if fill is None:
+            continue
+        confirmed = op is not None and op["t0"] == last and op["dir"] == d
+        log_trade("rest_fill", s, contract=local, dir=d, qty=o["qty"], bar_time=iso(last_ts),
+                  engine_px=o["trigger"], actual_px=fill, stop=o["stop"], order_id=o["entry_order_id"],
+                  note=f"line {o['line_level']:.6g} refit {o['refit_level']:.6g}" +
+                       (f"; provisional stop filled {stop_hit:.6g}" if stop_hit is not None else ""))
+        if confirmed:
+            P = dict(entry_ts=last_ts, dir=d, entry=op["entry"], stop0=op["stop0"], stop=o["stop"],
+                     R=op["R"], phase=op["phase"], qty=o["qty"], con_id=c.conId if c else None, local=local,
+                     exchange=c.exchange if c else None, fill=fill, entry_order_id=o["entry_order_id"],
+                     stop_order_id=o["stop_order_id"], broker_closed=stop_hit if stop_hit is not None else None,
+                     opened=datetime.now(UTC).isoformat(timespec="seconds"), via="resting")
+            state["positions"][s] = P
+            log_trade("confirm", s, contract=local, dir=d, qty=o["qty"], bar_time=iso(last_ts),
+                      engine_px=op["entry"], actual_px=fill, stop=op["stop0"], R_px=op["R"],
+                      why=f"{op['kind']} line; {len(op['tch'])} touches; stop {op['stop_src']}",
+                      note="fill vs engine " + f"{(fill - op['entry']) * d / op['R']:+.3f}R")
+        else:
+            exit_px, oid, note = None, None, ""
+            if stop_hit is not None:
+                exit_px, note = stop_hit, "closed by provisional stop"
+            elif paper:
+                broker.cancel(o["stop_order_id"])
+                exit_px, oid = broker.close(oc)
+                if exit_px is None:
+                    exit_px = broker.fill_of(o["stop_order_id"]); note = "already flat"
+            else:
+                exit_px = C
+            pnl_atr = ((exit_px - fill) * d / A) if exit_px is not None else None
+            log_trade("scratch", s, contract=local, dir=d, qty=o["qty"], bar_time=iso(last_ts),
+                      engine_px=o["trigger"], actual_px=fill, order_id=oid,
+                      note=(f"engine did not confirm; exit {exit_px:.6g}, {pnl_atr:+.3f} ATR " if exit_px is not None
+                            else "engine did not confirm; exit unknown ") + note)
+
+
+def place_resting(s, state, broker, st, taken, op, details, tick):
+    """Rest at most one stop order per direction for the next bar, only when
+    both the bot and the engine are flat."""
+    if s in state["positions"] or op is not None:
+        return
+    orders = next_bar_orders(st, taken)
+    if not orders:
+        return
+    T = st.T; last_ts = int(T[-1])
+    paper = MODE == "paper" and broker is not None
+    c = details.contract if details else None
+    oc = broker.order_contract(c.conId, c.exchange, c.currency) if (c and broker) else None
+    oca = f"{s}-{last_ts}"
+    placed = []
+    for d, o in orders.items():
+        trigger = round_trigger(o["trigger"], tick, d)
+        spx = round_stop(o["stop"], tick, d)
+        rec = dict(dir=d, trigger=trigger, stop=spx, edge=list(o["edge"]), line_level=o["line_level"],
+                   refit_level=o["refit_level"], qty=QTY, placed_after=last_ts, entry_order_id=None, stop_order_id=None)
+        if paper:
+            rec["entry_order_id"], rec["stop_order_id"] = broker.place_resting(oc, d, QTY, trigger, spx, oca)
+        placed.append(rec)
+    state["resting"][s] = placed
+    log_event(f"rest {s:5s} " + "  ".join(f"{'short' if r['dir'] < 0 else 'long'} @{r['trigger']:.6g} stop {r['stop']:.6g}"
+                                          for r in placed))
+
+
+# ----------------------------------------------------------------------------
 # State
 # ----------------------------------------------------------------------------
 def load_state():
     if os.path.exists(STATE_FILE):
         s = json.load(open(STATE_FILE))
     else:
-        s = dict(mode=MODE, positions={}, last_bar={}, missed=[], excluded={},
+        s = dict(mode=MODE, positions={}, last_bar={}, missed=[], excluded={}, resting={},
                  started=datetime.now(UTC).isoformat(timespec="seconds"))
+    s.setdefault("resting", {})
     if s.get("mode") != MODE:
         if s["positions"]:
             sys.exit(f"state file was written in {s.get('mode')} mode with open positions; "
@@ -731,10 +898,18 @@ def run_pass(broker, state, catalog, syms):
                 new = update_cache(s, broker, now_utc, et_today)
             if state["excluded"].pop(s, None):
                 log_trade("included", s, note="data ok again")
-            if new == 0 and broker is not None and s not in state["positions"]:
-                continue                        # nothing new, nothing held
+            if new == 0 and broker is not None and s not in state["positions"] and not state["resting"].get(s):
+                continue                        # nothing new, nothing held, nothing resting
             T, trades, op = run_engine(s)
+            st, taken = None, set()
+            tick = stop_tick(s, details)
+            if EXEC == "resting":
+                st = scan(cache_path(s), int(T.min()) + WARMUP_DAYS * 86400)
+                taken, _ = taken_edges(st, trades + ([op] if op else []))
+                settle_resting(s, state, broker, st, T, op, details, tick)
             reconcile(s, T, trades, op, state, broker, details, now_utc)
+            if EXEC == "resting":
+                place_resting(s, state, broker, st, taken, op, details, tick)
         except DataError as e:
             if state["excluded"].get(s) != str(e):
                 state["excluded"][s] = str(e)
@@ -810,13 +985,31 @@ def replay(n, s, catalog):
     for k in range(n, 0, -1):
         append_cache(s, [rows[len(rows) - k]])
         Tc, trades, op = run_engine(s)
+        st, taken = None, set()
+        if EXEC == "resting":
+            st = scan(cache_path(s), int(Tc.min()) + WARMUP_DAYS * 86400)
+            taken, _ = taken_edges(st, trades + ([op] if op else []))
+            settle_resting(s, state, None, st, Tc, op, None, TICK_FOR_REPLAY.get(s, 0.0))
         reconcile(s, Tc, trades, op, state, None, None, datetime.now(UTC))
+        if EXEC == "resting":
+            place_resting(s, state, None, st, taken, op, None, TICK_FOR_REPLAY.get(s, 0.0))
         save_state(state)
     print(f"\nreplay done -> {TRADE_LOG}")
     if os.path.exists(TRADE_LOG):
+        counts = defaultdict(int)
         for r in csv.DictReader(open(TRADE_LOG)):
-            print(f"  {r['event']:10s} {r['bar_time']:16s} dir {r['dir']:>2s} engine {r['engine_px']:>10s} "
-                  f"stop {r['stop']:>10s} R {r['R_engine']:>7s} {r['why']} {r['note']}")
+            counts[r["event"]] += 1
+            if r["event"] != "stop_move":
+                print(f"  {r['event']:11s} {r['bar_time']:16s} dir {r['dir']:>2s} engine {r['engine_px']:>10s} "
+                      f"fill {r['actual_px']:>10s} stop {r['stop']:>10s} R {r['R_engine']:>7s} {r['note']}")
+        print("  counts:", dict(counts))
+        diffs = []
+        for r in csv.DictReader(open(TRADE_LOG)):
+            if r["event"] == "confirm" and "fill vs engine" in r["note"]:
+                try: diffs.append(float(r["note"].split("fill vs engine")[1].strip().rstrip("R")))
+                except ValueError: pass
+        if diffs:
+            print(f"  confirmed fills: {len(diffs)}, fill vs engine price avg {sum(diffs) / len(diffs):+.4f}R")
 
 
 if __name__ == "__main__":
