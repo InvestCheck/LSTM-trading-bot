@@ -116,6 +116,14 @@ def main():
     L.append("\nWeights are the exploration fit; a weight only means something if the holdout test above passed.")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     open(OUT, "w").write("\n".join(L) + "\n"); print("\n".join(L)); print(f"\n-> {OUT}")
+    # freeze the model: everything needed to score a new signal, fit on 2008 to 2016 only
+    import json
+    json.dump(dict(fit_years=f"2008-{SPLIT_YEAR - 1}", ridge=RIDGE, names=NAMES, mu=mu.tolist(), sd=sd.tolist(),
+                   weights=w[:-1].tolist(), intercept=float(w[-1]), cutoff=cut,
+                   holdout=dict(n=len(hold), diff=float(d), t=float(t), verdict=verdict),
+                   note="score = intercept + sum(w * (x - mu) / sd); top tier if score >= cutoff"),
+              open("research/tier_model.json", "w"), indent=1)
+    print("-> research/tier_model.json (frozen fit)")
 
 
 if __name__ == "__main__":
