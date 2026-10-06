@@ -170,7 +170,7 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
             elif e200[t] > entry + floor: stop = float(e200[t]); stop_src = 'ema'
             else: continue
             if stop - entry <= 0: continue
-            sigs.append(dict(dir=-1, t0=int(t), entry=float(entry), stop0=float(stop), a=int(a2),
+            sigs.append(dict(dir=-1, t0=int(t), entry=float(entry), stop0=float(stop), a=int(a2), m2=float(m2),
                              kind='sup', touches=len(tch), stop_src=stop_src, edge=(int(a), int(b), 's'),
                              order=order)); order += 1
         if True:
@@ -209,7 +209,7 @@ def harvest(path, tol=0.0015, toltouch=0.0010, touch_band=0.0005, brk_tol=0.0002
                 elif e200[t] < entry - floor: stop = float(e200[t]); stop_src = 'ema'
                 else: continue
                 if entry - stop <= 0: continue
-                sigs.append(dict(dir=1, t0=int(t), entry=float(entry), stop0=float(stop), a=int(a2),
+                sigs.append(dict(dir=1, t0=int(t), entry=float(entry), stop0=float(stop), a=int(a2), m2=float(m2),
                                  kind='res', touches=len(tch), stop_src=stop_src, edge=(int(a), int(b), 'r'),
                                  order=order)); order += 1
     return dict(T=T, O=O, H=H, L=L, C=C, e21=e21, e50=ema(C, 50), e200=e200, A=A, touches=touches), sigs
