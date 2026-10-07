@@ -71,7 +71,7 @@ Usage
                                             writes replay_trade_log.csv
 Environment: DATA_DIR (vendor files folder, default ./seed), MODE (shadow|paper).
 """
-import os, sys, csv, json, math, time, traceback, statistics as st
+import os, sys, csv, json, math, time, traceback, subprocess, statistics as st
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
@@ -105,6 +105,9 @@ EVENT_LOG = "events.log"
 SPLICE_MIN_BARS, SPLICE_MAX_OFF = 10, 0.6        # overlap bars needed; max share of bars off >1% from the median ratio
 MAX_CATCHUP_DAYS = 120                           # longest gap the bot will try to fill from IBKR
 FILL_WAIT_S = 20
+GW_CONTAINER = os.environ.get("GW_CONTAINER", "ibgw-ibgw-1")   # docker container running IB Gateway
+GW_RESTART_AFTER_S = 20 * 60          # restart Gateway if IBKR link has been down this long
+GW_RESTART_MIN_GAP_S = 2 * 3600       # and never more often than this
 
 ET = ZoneInfo("America/New_York")
 UTC = timezone.utc
@@ -238,10 +241,30 @@ class Broker:
         self.ib.errorEvent += self._on_error
         self._resolved = {}          # sym -> (ContractDetails, roll_date, et_date)
         self.account = None
+        self.link_ok = True          # IBKR server link as reported by Gateway (1100 lost, 1101/1102 back)
+        self.lost_since = None
+        self.last_gw_restart = 0.0
+        self._last_logged = {}
 
     def _on_error(self, reqId, code, msg, contract=None):
         if code in (2104, 2106, 2107, 2108, 2158, 2119, 2100, 10349, 202, 399):
-            return                   # farm status, order echo, TIF default: noise
+            return                   # farm status OK, order echo, TIF default: noise
+        if code == 1100:
+            if self.link_ok:
+                self.link_ok = False
+                self.lost_since = self.lost_since or time.time()
+                log_event("[ib] IBKR link LOST (1100): Gateway has no connection to IBKR servers")
+            return
+        if code in (1101, 1102):
+            if not self.link_ok:
+                down = time.time() - (self.lost_since or time.time())
+                log_event(f"[ib] IBKR link restored ({code}) after {down / 60:.0f} min")
+            self.link_ok = True; self.lost_since = None
+            return
+        key = (code, msg[:60]) if reqId == -1 else (code, reqId)
+        if reqId == -1 and time.time() - self._last_logged.get(key, 0) < 600:
+            return                   # same system message within 10 minutes
+        self._last_logged[key] = time.time()
         log_event(f"[ib] error {code} req {reqId}: {msg}")
 
     def connect(self):
@@ -261,12 +284,63 @@ class Broker:
                     sys.exit(2)
                 log_event(f"connected to IBKR {accts} on {PORT} ({MODE})")
                 self._resolved.clear()
+                self.link_ok = True   # unknown until Gateway says otherwise; healthy() verifies
                 return True
             except SystemExit:
                 raise
             except Exception as e:
                 log_event(f"connect attempt {attempt + 1} failed: {e}")
                 time.sleep(20)
+        return False
+
+    def healthy(self):
+        """Socket up, Gateway reports an IBKR link, and a trivial request answers fast."""
+        if not self.ib.isConnected() or not self.link_ok:
+            return False
+        old = self.ib.RequestTimeout
+        try:
+            self.ib.RequestTimeout = 15
+            return self.ib.reqCurrentTime() is not None
+        except Exception:
+            return False
+        finally:
+            self.ib.RequestTimeout = old
+
+    def restart_gateway(self):
+        log_event(f"restarting Gateway container {GW_CONTAINER} (IBKR link down "
+                  f"{(time.time() - (self.lost_since or time.time())) / 60:.0f} min)")
+        self.last_gw_restart = time.time()
+        try: self.ib.disconnect()
+        except Exception: pass
+        try:
+            r = subprocess.run(["docker", "restart", GW_CONTAINER], capture_output=True, text=True, timeout=180)
+            if r.returncode != 0:
+                log_event(f"docker restart failed: {r.stderr.strip()[:200]}")
+        except Exception as e:
+            log_event(f"docker restart failed: {e}")
+        time.sleep(120)              # IBC logs in again
+
+    def ensure(self):
+        """Make sure the pass can run. Reconnects, and restarts Gateway when the
+        IBKR link has been down for a while. Returns False fast when it cannot."""
+        if self.healthy():
+            return True
+        if self.lost_since is None:
+            self.lost_since = time.time()
+        log_event("health check failed; reconnecting")
+        for _ in range(2):
+            try: self.ib.disconnect()
+            except Exception: pass
+            time.sleep(10)
+            if self.connect() and self.healthy():
+                self.lost_since = None
+                return True
+        down = time.time() - self.lost_since
+        if down >= GW_RESTART_AFTER_S and time.time() - self.last_gw_restart >= GW_RESTART_MIN_GAP_S:
+            self.restart_gateway()
+            if self.connect() and self.healthy():
+                self.lost_since = None
+                return True
         return False
 
     def resolve(self, s, et_today):
@@ -596,7 +670,7 @@ def r_actual(P, exit_px):
     return (exit_px - P["fill"]) / P["R"] * P["dir"]
 
 
-def reconcile(s, T, trades, op, state, broker, details, now_utc):
+def reconcile(s, T, trades, op, state, broker, details, now_utc, st_scan=None):
     last = len(T) - 1
     last_ts = int(T[last])
     last_done = state["last_bar"].get(s)
@@ -624,11 +698,13 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc):
                 xt = int(T[x["exit_idx"]])
                 if xt <= wm[s]: continue
                 et = int(T[x["t0"]])
+                a_t0 = st_scan.A[x["t0"]] if st_scan is not None and st_scan.A[x["t0"]] > 0 else None
                 log_trade("engine_trade", s, contract=local, dir=x["dir"], bar_time=iso(et),
                           engine_px=x["entry"], stop=x["stop0"], R_px=abs(x["entry"] - x["stop0"]),
                           R_engine=x["R"], why=x["why"],
                           note=f"exit {iso(xt)} at {x['exit']:.6g}; v1 scored set; "
-                               + ("executed" if et in executed else "not executed"))
+                               + ("executed" if et in executed else "not executed")
+                               + (f"; stop {abs(x['entry'] - x['stop0']) / a_t0:.2f} ATR" if a_t0 else ""))
             wm[s] = newest
 
     # ---- 0. pick up fills still pending from an earlier pass -------------
@@ -829,7 +905,8 @@ def settle_resting(s, state, broker, st, T, op, details, tick):
                       engine_px=op["entry"], actual_px=fill, stop=op["stop0"], R_px=op["R"],
                       why=f"{op['kind']} line; {len(op['tch'])} touches; stop {op['stop_src']}",
                       note="fill vs engine " + f"{(fill - op['entry']) * d / op['R']:+.3f}R"
-                           + (f"; tier {o['score']:+.3f}" if o.get("score") is not None else ""))
+                           + (f"; tier {o['score']:+.3f}" if o.get("score") is not None else "")
+                           + f"; stop {op['R'] / A:.2f} ATR")
         else:
             exit_px, oid, note = None, None, ""
             if stop_hit is not None:
@@ -916,6 +993,12 @@ def save_state(s):
 def run_pass(broker, state, catalog, syms):
     now_utc = datetime.now(UTC)
     et_today = now_utc.astimezone(ET).date()
+    if broker is not None and not broker.ensure():
+        down = (time.time() - broker.lost_since) / 60 if broker.lost_since else 0
+        log_trade("gap", "ALL", note=f"pass skipped: IBKR not reachable (down {down:.0f} min); "
+                                     f"logged per protocol, clock extends")
+        log_event("pass skipped: IBKR not reachable")
+        return
     if broker is not None:
         try:
             broker.ib.reqAllOpenOrders(); broker.ib.sleep(1)
@@ -923,8 +1006,9 @@ def run_pass(broker, state, catalog, syms):
             log_event(f"reqAllOpenOrders failed: {e}")
     t_start = time.time()
     for s in syms:
-        if broker is not None and not broker.ib.isConnected():
-            log_event("connection lost mid pass; rest of the pass skipped"); break
+        if broker is not None and (not broker.ib.isConnected() or not broker.link_ok):
+            log_trade("gap", "ALL", note=f"IBKR link lost mid pass at {s}; rest of the pass skipped")
+            log_event("IBKR link lost mid pass; rest of the pass skipped"); break
         try:
             details = None
             if broker is not None:
@@ -945,7 +1029,7 @@ def run_pass(broker, state, catalog, syms):
                 st = scan(cache_path(s), int(T.min()) + WARMUP_DAYS * 86400)
                 taken, _ = taken_edges(st, trades + ([op] if op else []))
                 settle_resting(s, state, broker, st, T, op, details, tick)
-            reconcile(s, T, trades, op, state, broker, details, now_utc)
+            reconcile(s, T, trades, op, state, broker, details, now_utc, st)
             if EXEC == "resting":
                 place_resting(s, state, broker, st, taken, op, details, tick)
         except DataError as e:
@@ -1001,9 +1085,6 @@ def main():
             log_event(f"next pass at {nxt.astimezone(ET):%H:%M %Z} ({wait / 60:.0f} min)")
             while (nxt - datetime.now(UTC)).total_seconds() > 0:
                 time.sleep(min(30, max(1, (nxt - datetime.now(UTC)).total_seconds())))
-            if not broker.connect():
-                log_event("no connection; pass skipped")
-                continue
             run_pass(broker, state, catalog, syms)
     except KeyboardInterrupt:
         log_event("stopped by user")
@@ -1034,7 +1115,7 @@ def replay(n, s, catalog):
             st = scan(cache_path(s), int(Tc.min()) + WARMUP_DAYS * 86400)
             taken, _ = taken_edges(st, trades + ([op] if op else []))
             settle_resting(s, state, None, st, Tc, op, None, TICK_FOR_REPLAY.get(s, 0.0))
-        reconcile(s, Tc, trades, op, state, None, None, datetime.now(UTC))
+        reconcile(s, Tc, trades, op, state, None, None, datetime.now(UTC), st)
         if EXEC == "resting":
             place_resting(s, state, None, st, taken, op, None, TICK_FOR_REPLAY.get(s, 0.0))
         save_state(state)
