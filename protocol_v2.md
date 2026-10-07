@@ -71,6 +71,42 @@ sample (gross +0.12R, net -0.05R).
 Not included: the stop size rule (initial stop within 2.5 ATR), holdout t 2.30
 against a bar of 2.45. Parked for v3.
 
+## Execution realism, measured before the run (October 2026)
+
+Two studies on the 2017 to 2026 v2 trades, both committed on `research`:
+
+- `research/1m_report.md`: the 1 minute path through each entry hour. A stop
+  order at the bot's trigger fills at the line or better in 62% of entries, but
+  20% of fills are more than 5 ticks through it, and those fast breaks are the
+  best trades on paper. A stop limit does not help (keeping only the slow fills
+  is worse).
+- `research/placement_report.md`: resting at the refit line instead of the
+  deeper line recovers the engine's price but turns one touch in four into a
+  scratch; net worse. Placement stays at the deeper line.
+
+Per trade, holdout 2017 to 2026:
+
+| | v2 | v2 + stop rule |
+|---|---|---|
+| engine (backtest) | +0.083R | +0.166R |
+| at the deeper line, no slippage (what IBKR paper fills will show) | +0.048R | +0.102R |
+| realistic stop fill (mid of the breach minute) | +0.019R | +0.051R |
+
+**IBKR's paper engine fills stop orders at the trigger, so the paper run will
+look like the middle row, not the bottom row.** The bottom row is the honest
+expectation for real money and is recorded here so the paper result is not
+mistaken for it.
+
+## v3 hypothesis, scored as a subset of this run
+
+Stop size rule: initial stop within 2.5 ATR of entry. Preregistered and tested
+three times on the 2017 to 2026 holdout (t 2.30, then 2.91 on the v2 base,
+`research/v3_report.md`); it also holds up best under realistic fills. It is
+NOT applied to execution, so the run keeps the fill data on every v2 trade;
+every `confirm` and `engine_trade` row records the stop size in ATR, and the
+v2 + stop rule result is scored from those rows as a subset, with the same
+categories as v2.
+
 ## Scoring v2
 
 Scored set: trades the bot executed, as logged at the time (`confirm` and
@@ -121,21 +157,19 @@ Both results, v1 and v2, at the same prominence, whatever they show, plus the
 fill statistics. If v2 is FAIL and v1 is not, the executed subset was a
 mistake and the honest summary says so.
 
-## Parked for v3 (untested on forward data; the forward run is their holdout)
+## Parked (positive on the holdout, not significant; the forward run is their holdout)
 
-1. Stop size rule: skip signals whose initial stop is more than 2.5 ATR away
-2. Retest entry: after a confirmed break, enter on a return to within 0.25 ATR
-   of the line within N bars; skip if no retest
-3. 1 minute confirmation: enter on the first 1 minute close through the line
-   instead of the touch
-4. Chandelier 3 ATR trail as the exit
-5. Day session only (8:00 to 17:00 ET)
-6. Nonlinear or yearly refit tier model
-7. Pyramiding: add on a second same direction break once past 1R
-8. Portfolio layer: vol targeting per instrument, caps per asset cluster
+- Chandelier 3 ATR trail as the exit (paired t 1.99)
+- Day session only, 08:00 to 16:59 ET (t 2.24)
+- Conviction sizing, 1.5 units on the top score quartile (Sharpe +0.09, t 1.78)
+- Cluster cap, at most 3 concurrent trades per asset class (t 0.38)
+- Nonlinear or yearly refit tier model (untested)
 
-Killed, not on the list: band fade, equity index exclusion, shorts only, four
-touch lines, half off at 1R, removing the parabolic exit.
+Killed on the holdout (`research/v3_report.md`, `research/1m_report.md`,
+`research/placement_report.md`): retest entry, pyramiding, 1 minute
+confirmation entry, resting at the refit line. Killed earlier: band fade,
+equity index exclusion, shorts only, four touch lines, half off at 1R,
+removing the parabolic exit.
 
 ---
 
