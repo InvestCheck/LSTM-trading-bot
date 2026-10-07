@@ -87,9 +87,9 @@ TIER = None                                      # protocol v2 gate, loaded in m
 # Config (frozen; see protocol)
 # ----------------------------------------------------------------------------
 MODE = os.environ.get("MODE", "shadow")          # shadow | paper
-PROTOCOL = os.environ.get("PROTOCOL", "v2")      # v1: execute every signal. v2: execute only signals that pass the
-                                                 # tier cut and cost cap (protocol_v2.md); v1's full signal set is
-                                                 # still logged and scored on engine prices from the same run.
+PROTOCOL = os.environ.get("PROTOCOL", "v2")      # v1: execute every signal. v2: tier cut + cost cap. v3: v2 + stop
+                                                 # within 2.5 ATR (protocol_v2.md). Every engine signal is logged
+                                                 # with its gate result, so v1 and v2 are scored from the same run.
 EXEC = os.environ.get("EXEC", "resting")         # resting: stop orders at the line, confirmed or scratched at the
                                                  # close (fills at the line like the backtest). market: enter at the
                                                  # next open after the engine signals (loses ~0.07R/trade, research)
@@ -249,11 +249,11 @@ class Broker:
     def _on_error(self, reqId, code, msg, contract=None):
         if code in (2104, 2106, 2107, 2108, 2158, 2119, 2100, 10349, 202, 399):
             return                   # farm status OK, order echo, TIF default: noise
-        if code == 1100:
+        if code in (1100, 2110):
             if self.link_ok:
                 self.link_ok = False
                 self.lost_since = self.lost_since or time.time()
-                log_event("[ib] IBKR link LOST (1100): Gateway has no connection to IBKR servers")
+                log_event(f"[ib] IBKR link LOST ({code}): Gateway has no connection to IBKR servers")
             return
         if code in (1101, 1102):
             if not self.link_ok:
@@ -699,12 +699,14 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc, st_scan=None):
                 if xt <= wm[s]: continue
                 et = int(T[x["t0"]])
                 a_t0 = st_scan.A[x["t0"]] if st_scan is not None and st_scan.A[x["t0"]] > 0 else None
+                cand = state.get("cand", {}).get(s, {}).get(str(et))
+                gate = (f"; gate: {cand['note']}" + ("" if cand["exec"] else " (skipped)")) if cand and cand.get("dir") == x["dir"] else "; gate: no candidate"
                 log_trade("engine_trade", s, contract=local, dir=x["dir"], bar_time=iso(et),
                           engine_px=x["entry"], stop=x["stop0"], R_px=abs(x["entry"] - x["stop0"]),
                           R_engine=x["R"], why=x["why"],
                           note=f"exit {iso(xt)} at {x['exit']:.6g}; v1 scored set; "
                                + ("executed" if et in executed else "not executed")
-                               + (f"; stop {abs(x['entry'] - x['stop0']) / a_t0:.2f} ATR" if a_t0 else ""))
+                               + (f"; stop {abs(x['entry'] - x['stop0']) / a_t0:.2f} ATR" if a_t0 else "") + gate)
             wm[s] = newest
 
     # ---- 0. pick up fills still pending from an earlier pass -------------
@@ -794,9 +796,13 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc, st_scan=None):
             # the engine signalled on the bar that closed but no resting order filled: the
             # line it broke was not in the order set (or the level differed). Not backfilled.
             state["missed"].append(t0ts)
-            log_trade("missed_fill", s, contract=local, dir=op["dir"], bar_time=iso(t0ts),
+            why_none = state.get("no_order", {}).get(s, {})
+            reason = why_none.get("all") or why_none.get(str(op["dir"])) or "line not in the order set, or level differed"
+            kind = "gate_skip" if "skip" in reason else "missed_fill"
+            log_trade(kind, s, contract=local, dir=op["dir"], bar_time=iso(t0ts),
                       engine_px=op["entry"], stop=op["stop0"], R_px=op["R"],
-                      note="engine signal without a resting fill; not backfilled")
+                      note=f"engine signal without a resting fill ({reason}); not backfilled"
+                           + (f"; stop {op['R'] / st.A[op['t0']]:.2f} ATR" if st.A[op['t0']] > 0 else ""))
         elif t0ts not in state["missed"] and (last_done is None or t0ts > last_done):
             state["missed"].append(t0ts)
             log_trade("missed", s, contract=local, dir=op["dir"], bar_time=iso(t0ts),
@@ -929,7 +935,9 @@ def place_resting(s, state, broker, st, taken, op, details, tick):
     """Rest at most one stop order per direction for the next bar, only when
     both the bot and the engine are flat."""
     if s in state["positions"] or op is not None:
+        state.setdefault("no_order", {})[s] = {"all": "in position at placement", "ts": int(st.T[-1])}
         return
+    state.setdefault("no_order", {}).pop(s, None)
     orders = next_bar_orders(st, taken)
     if not orders:
         return
@@ -940,24 +948,29 @@ def place_resting(s, state, broker, st, taken, op, details, tick):
     oca = f"{s}-{last_ts}"
     placed, skipped = [], []
     for d, o in orders.items():
-        score, gate_note = None, ""
-        if PROTOCOL == "v2" and TIER is not None:
-            ok, score, gate_note = TIER.allows(s, st, o, last_ts + 3600)
+        score, gate_note, stop_atr = None, "", None
+        if PROTOCOL in ("v2", "v3") and TIER is not None:
+            ok, score, stop_atr, gate_note = TIER.allows(s, st, o, last_ts + 3600, stop_rule=(PROTOCOL == "v3"))
+            cands = state.setdefault("cand", {}).setdefault(s, {})
+            cands[str(last_ts + 3600)] = dict(dir=d, score=score, stop_atr=stop_atr, exec=ok, note=gate_note)
+            for k in [k for k in cands if int(k) < last_ts - 7 * 86400]: del cands[k]
             if not ok:
-                skipped.append(f"{'short' if d < 0 else 'long'} @{o['trigger']:.6g} v2 skip: {gate_note}")
+                skipped.append(f"{'short' if d < 0 else 'long'} @{o['trigger']:.6g} {PROTOCOL} skip: {gate_note}")
+                state.setdefault("no_order", {})[s] = {str(d): f"{PROTOCOL} skip: {gate_note}", "ts": last_ts}
                 continue
         trigger = round_trigger(o["trigger"], tick, d)
         spx = round_stop(o["stop"], tick, d)
         rec = dict(dir=d, trigger=trigger, stop=spx, edge=list(o["edge"]), line_level=o["line_level"],
                    refit_level=o["refit_level"], qty=QTY, placed_after=last_ts, entry_order_id=None,
-                   stop_order_id=None, score=score)
+                   stop_order_id=None, score=score, stop_atr=stop_atr)
         if paper:
             rec["entry_order_id"], rec["stop_order_id"] = broker.place_resting(oc, d, QTY, trigger, spx, oca)
         placed.append(rec)
     if placed:
         state["resting"][s] = placed
     msg = "  ".join(f"{'short' if r['dir'] < 0 else 'long'} @{r['trigger']:.6g} stop {r['stop']:.6g}"
-                    + (f" score {r['score']:+.3f}" if r.get("score") is not None else "") for r in placed)
+                    + (f" score {r['score']:+.3f}" if r.get("score") is not None else "")
+                    + (f" {r['stop_atr']:.2f}ATR" if r.get("stop_atr") is not None else "") for r in placed)
     if skipped:
         msg += ("  | " if msg else "") + "  ".join(skipped)
     log_event(f"rest {s:5s} " + msg)
@@ -1004,9 +1017,10 @@ def run_pass(broker, state, catalog, syms):
             broker.ib.reqAllOpenOrders(); broker.ib.sleep(1)
         except Exception as e:
             log_event(f"reqAllOpenOrders failed: {e}")
-    t_start = time.time()
+    t_start = time.time(); fails = 0
     for s in syms:
-        if broker is not None and (not broker.ib.isConnected() or not broker.link_ok):
+        if broker is not None and (not broker.ib.isConnected() or not broker.link_ok or
+                                   (fails >= 3 and not broker.healthy())):
             log_trade("gap", "ALL", note=f"IBKR link lost mid pass at {s}; rest of the pass skipped")
             log_event("IBKR link lost mid pass; rest of the pass skipped"); break
         try:
@@ -1032,11 +1046,13 @@ def run_pass(broker, state, catalog, syms):
             reconcile(s, T, trades, op, state, broker, details, now_utc, st)
             if EXEC == "resting":
                 place_resting(s, state, broker, st, taken, op, details, tick)
+            fails = 0
         except DataError as e:
             if state["excluded"].get(s) != str(e):
                 state["excluded"][s] = str(e)
                 log_trade("excluded", s, note=str(e))
         except Exception as e:
+            fails += 1
             log_event(f"[{s}] ERROR {e}\n{traceback.format_exc()}")
         finally:
             save_state(state)
@@ -1060,11 +1076,12 @@ def main():
         sys.exit(f"MODE must be shadow or paper, got {MODE!r}; there is no live mode")
     catalog = build_catalog(DATA_DIR)
     global TIER
-    if PROTOCOL == "v2":
-        from tier import Tier
+    if PROTOCOL in ("v2", "v3"):
+        from tier import Tier, STOP_MAX_ATR
         TIER = Tier()
-        log_event(f"protocol v2: tier cutoff {TIER.cutoff:+.4f} (fit {TIER.fit_years}), cost cap {TIER.cost_cap}R, "
-                  f"{len(TIER.cheap)} instruments pass the cap")
+        log_event(f"protocol {PROTOCOL}: tier cutoff {TIER.cutoff:+.4f} (fit {TIER.fit_years}), cost cap {TIER.cost_cap}R, "
+                  f"{len(TIER.cheap)} instruments pass the cap"
+                  + (f", stop within {STOP_MAX_ATR} ATR" if PROTOCOL == "v3" else ""))
 
     if "--replay" in args:
         return replay(int(args[args.index("--replay") + 1]), args[args.index("--replay") + 2], catalog)

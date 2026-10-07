@@ -7,6 +7,8 @@ close of the bar BEFORE the order fills (the bar the order is placed on).
 v2 executes a signal only if
   1. the instrument's average round trip cost is <= COST_CAP (v2_config.json), and
   2. the candidate's tier score is >= the frozen cutoff (the exploration median).
+v3 adds
+  3. the provisional stop is within STOP_MAX_ATR of the entry level (previous bar's ATR).
 
 Feature order must match research_model.NAMES exactly; it is asserted against
 the names stored in the frozen file.
@@ -24,6 +26,7 @@ CLASSES = {
     "METALS": "GC MGC SI HG PA PL".split(),
     "AGS": "ZC XC ZS ZL ZM KE CT SB RS DC GF HE LE".split(),
 }
+STOP_MAX_ATR = 2.5
 PRE_ORDER = ["p_d_e21", "p_d_e50", "p_d_e200", "p_room", "p_mom5", "p_mom20", "p_ext_1y", "p_atr_ratio", "p_risk_atr"]
 NAMES = PRE_ORDER + ["log_span", "touches", "is_long", "stop_ema", "hour_sin", "hour_cos", "sunday", "inst_cost"] + list(CLASSES)
 
@@ -72,11 +75,15 @@ class Tier:
         z = np.clip((x - self.mu) / self.sd, -self.zclip, self.zclip)
         return float(self.b + z @ self.w)
 
-    def allows(self, sym, st, order, next_bar_ts):
-        """(execute?, score, reason)"""
+    def allows(self, sym, st, order, next_bar_ts, stop_rule=False):
+        """(execute?, score, stop_atr, reason)"""
+        a = st.A[st.n - 1]
+        stop_atr = abs(order["refit_level"] - order["stop"]) / a if a > 0 else float("nan")
         if sym not in self.cheap:
-            return False, None, f"cost {self.inst_cost.get(sym, float('nan')):.3f}R > cap"
+            return False, None, stop_atr, f"cost {self.inst_cost.get(sym, float('nan')):.3f}R > cap"
         sc = self.score(sym, st, order, next_bar_ts)
         if sc < self.cutoff:
-            return False, sc, f"score {sc:+.4f} < cutoff {self.cutoff:+.4f}"
-        return True, sc, f"score {sc:+.4f}"
+            return False, sc, stop_atr, f"score {sc:+.4f} < cutoff {self.cutoff:+.4f}"
+        if stop_rule and not stop_atr <= STOP_MAX_ATR:
+            return False, sc, stop_atr, f"score {sc:+.4f}; stop {stop_atr:.2f} ATR > {STOP_MAX_ATR}"
+        return True, sc, stop_atr, f"score {sc:+.4f}; stop {stop_atr:.2f} ATR"
