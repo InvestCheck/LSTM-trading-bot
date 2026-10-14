@@ -13,9 +13,14 @@ live bot places orders: only while the engine is flat, v2 gate at placement
 first, fill at the level (or the open if gapped), confirmed when the engine
 signals on that bar, otherwise scratched at that bar's close. Costs 2 ticks.
 
-Preregistered comparison (one test): per touch P&L in ATR, refit placement
-minus deeper placement, quarter block bootstrap, one sided z 1.64, on
-2017 to 2026. 2008 to 2016 reported for reference.
+Placements: deep (the deeper of the two lines), refit (the refit line), and
+gap aware hybrids hyb_K: the refit line when the two lines are more than K R
+apart (R = refit level to provisional stop), else the deeper line.
+
+Preregistered comparison (one test): the hybrid K with the best per touch P&L
+on 2008 to 2016 is tested on 2017 to 2026 against deep placement, per touch
+P&L in ATR, quarter block bootstrap, one sided z 1.64. The deep vs refit
+comparison and the breakdown by gap are reported for reference.
 
 Usage (repo folder):  python3 research_placement.py DATA_DIR [--symbols ...]
 Writes research/placement_report.md.
@@ -39,6 +44,8 @@ OUT = "research"
 WARMUP_DAYS = 60
 SPLIT_YEAR = 2017
 BOOT_REPS, SEED = 400, 41
+HYBRIDS = [0.1, 0.25, 0.5]
+MODES = ["deep", "refit"] + [f"hyb_{k}" for k in HYBRIDS]
 Z = NormalDist().inv_cdf(0.95)
 
 
@@ -113,14 +120,14 @@ def simulate(sym, path, start_ts, gate, tick):
 
     sh, rh, ih, il = [], [], 0, 0
     cache, dead, seen = {}, set(), set()   # edge -> (p1, s, tt, il_or_ih at compute); pierced raw lines
-    pending = {"deep": {}, "refit": {}}   # dir -> order placed for this bar
-    results = {"deep": [], "refit": []}
+    pending = {m: {} for m in MODES}   # mode -> dir -> order placed for this bar
+    results = {m: [] for m in MODES}
     def sl_low(i, j): return (L[j] - L[i]) / (j - i)
     def sl_high(i, j): return (H[j] - H[i]) / (j - i)
 
     for t in range(210, n):
         # ---- settle orders placed at t-1 for bar t
-        for mode in ("deep", "refit"):
+        for mode in MODES:
             for d, o in pending[mode].items():
                 trig = o["trigger"]
                 touched = (L[t] <= trig) if d < 0 else (H[t] >= trig)
@@ -133,10 +140,10 @@ def simulate(sym, path, start_ts, gate, tick):
                     Rf = abs(fill - sg["stop0"])
                     r = ((ex2 - fill) / Rf * d - (2.0 * tick / Rf if tick else 0.0)) if Rf > 0 else 0.0
                     results[mode].append(dict(t=t, ts=int(T[t]), kind="confirmed", atr=(ex2 - fill) * d / a - (2 * tick / a if tick else 0), R=r,
-                                              fill_vs_engine=(fill - sg["entry"]) * d / abs(sg["entry"] - sg["stop0"])))
+                                              fill_vs_engine=(fill - sg["entry"]) * d / abs(sg["entry"] - sg["stop0"]), gap=o["gap"]))
                 else:
                     results[mode].append(dict(t=t, ts=int(T[t]), kind="scratch", atr=(C[t] - fill) * d / a - (2 * tick / a if tick else 0), R=None,
-                                              fill_vs_engine=None))
+                                              fill_vs_engine=None, gap=o["gap"]))
             pending[mode] = {}
         # ---- hull update (engine order of operations)
         while il < len(PL) and PL[il] + K <= t:
@@ -151,7 +158,7 @@ def simulate(sym, path, start_ts, gate, tick):
         # ---- place orders for bar t+1 from data through t (the live bot at the close of t)
         nxt = t + 1
         for d, hull, piv, arr, npiv in ((-1, sh, PL, L, il), (1, rh, PH, H, ih)):
-            best = {"deep": None, "refit": None}
+            best = {m: None for m in MODES}
             for i in range(1, len(hull)):
                 a, b = hull[i - 1], hull[i]; key = (int(a), int(b), 's' if d < 0 else 'r')
                 if key in dead or (key in taken_at and taken_at[key] <= t): continue
@@ -199,11 +206,15 @@ def simulate(sym, path, start_ts, gate, tick):
                 if sym not in gate.cheap: continue
                 sc = gate.score(sym, D, t, d, lt2, stop, src, len(tt), nxt - a, int(T[t]) + 3600)
                 if sc < gate.cutoff: continue
-                cand = dict(dir=d, stop=stop, refit=float(lt2), raw=float(lt))
-                for mode, trig in (("deep", min(lt, lt2) if d < 0 else max(lt, lt2)), ("refit", lt2)):
+                deeper = min(lt, lt2) if d < 0 else max(lt, lt2)
+                gap = abs(lt2 - lt) / max(1e-12, abs(lt2 - stop))        # distance between the lines, in R
+                cand = dict(dir=d, stop=stop, refit=float(lt2), raw=float(lt), gap=float(gap))
+                trig_for = {"deep": deeper, "refit": lt2}
+                for k in HYBRIDS: trig_for[f"hyb_{k}"] = lt2 if gap > k else deeper
+                for mode, trig in trig_for.items():
                     if best[mode] is None or (d < 0 and trig > best[mode]["trigger"]) or (d > 0 and trig < best[mode]["trigger"]):
                         best[mode] = dict(cand, trigger=float(trig))
-            for mode in ("deep", "refit"):
+            for mode in MODES:
                 if best[mode] is not None: pending[mode][d] = best[mode]
     return results, [int(T[t]) for t in engine if t >= start]
 
@@ -218,7 +229,7 @@ def main():
             if a.startswith("--"): break
             syms.append(a)
     cat = build_catalog(args[0]); gate = Gate()
-    allres = {"deep": [], "refit": []}; engine_ts = []
+    allres = {m: [] for m in MODES}; engine_ts = []
     for sym in syms:
         if sym not in cat or sym not in gate.cheap: continue
         tick = TICK_FIX.get(sym, TICKS.get(sym, 0.0))
@@ -252,26 +263,42 @@ def main():
         sd = float(np.std(diffs)) if diffs else float("nan")
         return d, (d / sd if sd and sd > 0 else float("nan"))
 
-    L = ["# Resting order placement: deeper line vs refit line (v2 gate, engine flat only)\n",
-         "Both placements simulated bar by bar as the live bot would place them. Confirmed = the engine signalled on the "
-         "fill bar (scored with the actual fill and the engine's exit); scratched = closed at that bar's close. Costs 2 ticks. "
-         "One preregistered test: per touch P&L in ATR, refit minus deeper, 2017 to 2026, one sided z 1.64.\n",
-         "| period | placement | touches | confirmed (of engine trades) | scratched | confirmed avgR | fill vs engine (R) | scratch avg (ATR) | per touch (ATR) | ATR/yr |",
-         "|---|---|---|---|---|---|---|---|---|---|"]
-    verdict_line = ""
-    for period, cond in (("2008-2016", lambda r: r["ts"] < datetime(2017, 1, 1, tzinfo=timezone.utc).timestamp()),
-                         ("2017-2026", lambda r: r["ts"] >= datetime(2017, 1, 1, tzinfo=timezone.utc).timestamp())):
+    cut = datetime(2017, 1, 1, tzinfo=timezone.utc).timestamp()
+    periods = (("2008-2016", lambda r: r["ts"] < cut), ("2017-2026", lambda r: r["ts"] >= cut))
+    L = ["# Resting order placement: deeper line, refit line, and gap aware hybrids (v2 gate, engine flat only)\n",
+         "Placements simulated bar by bar as the live bot would place them. Confirmed = the engine signalled on the fill "
+         "bar (scored with the actual fill and the engine's exit); scratched = closed at that bar's close. Costs 2 ticks. "
+         "hyb_K = refit line when the lines are more than K R apart, else the deeper line.\n",
+         "| period | placement | touches | confirmed (of engine trades) | scratched | confirmed avgR | fill vs engine (R) | worst fill vs engine (R) | scratch avg (ATR) | per touch (ATR) | ATR/yr |",
+         "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for period, cond in periods:
         sub = {m: [r for r in allres[m] if cond(r)] for m in allres}
         n_eng = sum(1 for ts in engine_ts if cond(dict(ts=ts)))
-        for m in ("deep", "refit"):
-            s_ = summarize(sub[m])
+        for m in MODES:
+            s_ = summarize(sub[m]); worst = max([r["fill_vs_engine"] for r in sub[m] if r["fill_vs_engine"] is not None] or [0])
             L.append(f"| {period} | {m} | {s_['touches']} | {s_['confirmed']} of {n_eng} engine | {s_['scratched']} | {s_['conf_R']:+.4f} | "
-                     f"{s_['fill_vs_engine']:+.4f} | {s_['scr_atr']:+.4f} | {s_['per_touch']:+.4f} | {s_['total_atr'] / s_['yrs']:+.1f} |")
-        d, t = diff_t(sub["deep"], sub["refit"])
-        tag = "PASS" if (period == "2017-2026" and t > Z) else ("no" if period == "2017-2026" else "reference")
-        L.append(f"| {period} | refit minus deeper | | | | | | | {d:+.4f} (t {t:.2f}) | {tag} |")
-    L.append("\nfill vs engine: positive means the fill was worse than the engine's assumed entry, in R. "
-             "Deeper placement should show ~+0.03; refit placement should show ~0 with more scratches.")
+                     f"{s_['fill_vs_engine']:+.4f} | {worst:+.2f} | {s_['scr_atr']:+.4f} | {s_['per_touch']:+.4f} | {s_['total_atr'] / s_['yrs']:+.1f} |")
+    # breakdown by gap between the lines (holdout): where does each placement win?
+    L += ["\n## By gap between the lines, 2017 to 2026 (per touch ATR; n = touches)\n",
+          "| gap (R) | " + " | ".join(MODES) + " |", "|---|" + "---|" * len(MODES)]
+    hold = {m: [r for r in allres[m] if r["ts"] >= cut] for m in MODES}
+    for lo, hi in ((0, 0.05), (0.05, 0.1), (0.1, 0.25), (0.25, 0.5), (0.5, 1.0), (1.0, 99)):
+        cells = []
+        for m in MODES:
+            rs = [r for r in hold[m] if lo <= r["gap"] < hi]
+            cells.append(f"{np.mean([r['atr'] for r in rs]):+.3f} (n={len(rs)})" if rs else "-")
+        L.append(f"| {lo} to {hi} | " + " | ".join(cells) + " |")
+    # preregistered test: best hybrid on exploration, tested on holdout against deep
+    expl = {m: [r for r in allres[m] if r["ts"] < cut] for m in MODES}
+    best_h = max([f"hyb_{k}" for k in HYBRIDS], key=lambda m: np.mean([r["atr"] for r in expl[m]]) if expl[m] else -9)
+    d_e, t_e = diff_t(expl["deep"], expl[best_h]); d_h, t_h = diff_t(hold["deep"], hold[best_h])
+    d_r, t_r = diff_t(hold["deep"], hold["refit"])
+    L += ["\n## Preregistered test\n",
+          f"Best hybrid on 2008 to 2016: **{best_h}** (per touch {d_e:+.4f} ATR vs deep, t {t_e:.2f}).",
+          f"Holdout 2017 to 2026, {best_h} minus deep: **{d_h:+.4f} ATR per touch, t {t_h:.2f} -> {'PASS' if t_h > Z else 'no'}** (z {Z:.2f}).",
+          f"For reference, refit minus deep on the holdout: {d_r:+.4f} (t {t_r:.2f}).",
+          "\nfill vs engine: positive means the fill was worse than the engine's assumed entry, in R; the worst column is "
+          "the tail the deeper line placement carries (E1 on 2026-10-14 was +1.37R)."]
     open(os.path.join(OUT, "placement_report.md"), "w").write("\n".join(L) + "\n")
     print("\n".join(L)); print(f"\n-> {OUT}/placement_report.md")
 
