@@ -106,7 +106,11 @@ SPLICE_MIN_BARS, SPLICE_MAX_OFF = 10, 0.6        # overlap bars needed; max shar
 MAX_CATCHUP_DAYS = 120                           # longest gap the bot will try to fill from IBKR
 FILL_WAIT_S = 20
 GW_CONTAINER = os.environ.get("GW_CONTAINER", "ibgw-ibgw-1")   # docker container running IB Gateway
-GW_RESTART_AFTER_S = 20 * 60          # restart Gateway if IBKR link has been down this long
+GW_RESTART_AFTER_S = 10 * 60          # restart Gateway if IBKR link has been down this long
+LINK_RETRY_S = 5 * 60                 # while the link is down, retry recovery this often between passes
+GAP_MAX_R = 1.0                       # no order when the raw and refit lines are more than this far apart, in R:
+                                      # the fill would land over 1R from the engine's price and the engine's stop
+                                      # would no longer be 1R of risk (E1 2026-10-14: 1.37R apart, fill 1.37R worse)
 GW_RESTART_MIN_GAP_S = 2 * 3600       # and never more often than this
 
 ET = ZoneInfo("America/New_York")
@@ -949,6 +953,11 @@ def place_resting(s, state, broker, st, taken, op, details, tick):
     placed, skipped = [], []
     for d, o in orders.items():
         score, gate_note, stop_atr = None, "", None
+        gap_r = abs(o["refit_level"] - o["line_level"]) / max(1e-12, abs(o["refit_level"] - o["stop"]))
+        if gap_r > GAP_MAX_R:
+            skipped.append(f"{'short' if d < 0 else 'long'} @{o['trigger']:.6g} skip: lines {gap_r:.2f}R apart")
+            state.setdefault("no_order", {})[s] = {str(d): f"skip: lines {gap_r:.2f}R apart", "ts": last_ts}
+            continue
         if PROTOCOL in ("v2", "v3") and TIER is not None:
             ok, score, stop_atr, gate_note = TIER.allows(s, st, o, last_ts + 3600, stop_rule=(PROTOCOL == "v3"))
             cands = state.setdefault("cand", {}).setdefault(s, {})
@@ -1100,8 +1109,19 @@ def main():
             nxt = next_run(datetime.now(UTC))
             wait = (nxt - datetime.now(UTC)).total_seconds()
             log_event(f"next pass at {nxt.astimezone(ET):%H:%M %Z} ({wait / 60:.0f} min)")
+            last_try = time.time()
             while (nxt - datetime.now(UTC)).total_seconds() > 0:
-                time.sleep(min(30, max(1, (nxt - datetime.now(UTC)).total_seconds())))
+                # ib.sleep keeps the event loop running, so a dropped socket or a 1100 message is
+                # seen between passes; time.sleep would hide it until the next pass starts
+                broker.ib.sleep(min(30, max(1, (nxt - datetime.now(UTC)).total_seconds())))
+                # the overnight IBKR reset drops the link right after the 01:05 ET pass; instead of
+                # waiting an hour, recover now and re run the pass that was cut short
+                if (not broker.link_ok or not broker.ib.isConnected()) and time.time() - last_try >= LINK_RETRY_S \
+                        and (nxt - datetime.now(UTC)).total_seconds() > 120:
+                    last_try = time.time()
+                    if broker.ensure():
+                        log_event("link recovered between passes; running the interrupted pass now")
+                        run_pass(broker, state, catalog, syms)
             run_pass(broker, state, catalog, syms)
     except KeyboardInterrupt:
         log_event("stopped by user")
