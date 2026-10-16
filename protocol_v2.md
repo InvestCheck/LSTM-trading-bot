@@ -173,4 +173,4 @@ removing the parabolic exit.
 
 ---
 
-**Committed:** commit 6076eb0 on 2026-10-16, before the first paper fill. Execution: resting orders at the deeper line, gap cap 1R (no order when the raw and refit lines are more than 1R apart; adopted 2026-10-14 after E1 filled 1.37R from the engine's price).
+**Committed:** commit 08e6a0a on 2026-10-16, before the first paper fill. Execution: resting orders at the deeper line, gap cap 1R (no order when the raw and refit lines are more than 1R apart; adopted 2026-10-14 after E1 filled 1.37R from the engine's price).
