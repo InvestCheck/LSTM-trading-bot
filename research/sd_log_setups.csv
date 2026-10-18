@@ -1,0 +1,199 @@
+notion_id,date,entry_time,exit_time,dir,zone_age,result,r,approach,with_trend,fresh,session
+3914ff812d0980149cc1e4abc23c0698,2026-07-02,09:55,13:05,Short,,Scratch,10,,Y,Y,NY AM
+3924ff812d0980db94d6e0ba801cbd1d,2026-07-03,23:10,01,Short,,Loss,-1,,N,Y,Asian
+3954ff812d09805d903cfc031d38e9d4,2026-07-05,20:20,20:30,Short,,Scratch,4,,Y,Y,Asian
+3954ff812d09808ead52d0d336d419d0,2026-07-05,20:35,21:16,Long,,Loss,-1,,N,Y,Asian
+3954ff812d09800aa941dc5d1ac4e74d,2026-07-06,09:50,10:10,Short,,Loss,-1,,Y,Y,NY AM
+3964ff812d0980b3bfecffa897afeb8b,2026-07-06,20:15,21:20,Long,,Loss,-1,,N,Y,Asian
+3964ff812d0980e9b85af0b14d9687ac,2026-07-06,21:35,21:51,Long,,Scratch,1.8,,N,Y,Asian
+3964ff812d0980d9946bef79dce63c70,2026-07-07,07:40,8:10,Long,,Scratch,2,,N,Y,NY AM
+3964ff812d09809da658e110aba16001,2026-07-07,10:30,10:37,Long,,Loss,-1,,N,Y,NY AM
+3964ff812d09806f9a4cf0288e560997,2026-07-07,10:45,12:20,Long,,Win,3.5,,Y,N,NY AM
+3964ff812d09804e8d8bd9a7dd5bbffa,2026-07-07,19:50,19:55,Long,,Loss,-1,,N,Y,Asian
+3974ff812d09802aa2f0df5ae7964ac1,2026-07-07,20:05,20:45,Long,,Win,0.5,,Y,Y,Asian
+3974ff812d0980538625ee8bb6e04b1e,2026-07-07,20:15,20:25,Short,,Loss,-1,,N,Y,Asian
+3974ff812d098021b9dbf55f0bdbfd2f,2026-07-07,20:50,03:15,Short,,Win,3,,Y,Y,Asian
+3964ff812d0980ac8a54ffebc9545d94,2026-07-07,8:15,09:05,Short,,Scratch,2,,Y,Y,NY AM
+3974ff812d09804ab420f769ff71e81f,2026-07-08,09:45,11:25,Short,,Win,4.3,,Y,Y,NY AM
+3974ff812d09805eafe8f3d1edde298f,2026-07-08,13:05,13:25,Short,,Loss,-1,,N,N,NY PM
+3984ff812d0980a09bcbce93f7bdbc37,2026-07-08,20:00,20:03,Short,,Loss,-1,,N,Y,Asian
+3984ff812d0980048876ea2c931ede10,2026-07-08,20:05,23:00,Short,,Win,2,,Y,Y,Asian
+3984ff812d0980f99621cf8607382404,2026-07-09,01:35,04:00,Long,,Scratch,2.5,,Y,Y,London
+3984ff812d09801f88d3fcda6328b0be,2026-07-09,12:00,13:05,Short,,Loss,-1,,N,Y,NY PM
+3984ff812d098079a722db7512ef6ba7,2026-07-09,18:30,19:27,Long,,Win,2.1,,Y,Y,Asian
+3994ff812d0980298e0dc75212ca4a20,2026-07-09,23:10,00:57,Short,,Win,0.6,,Y,Y,Asian
+39c4ff812d0980e994e0c7e169c7f22f,2026-07-12,21:55,22:20,Long,,Win,1.5,,N,Y,Asian
+39c4ff812d0980059b04cd6d592d1587,2026-07-13,09:55,10:30,Long,,Scratch,3.5,,N,Y,NY AM
+39d4ff812d0980118779dcc139b05497,2026-07-13,23:00,23:15,Long,,Loss,-1,,Y,Y,Asian
+39d4ff812d098075b21ffbbfaa35ebc7,2026-07-15,03:05,04:20,Short,,Scratch,2.7,,Y,Y,London
+39d4ff812d098035b81ce982d73b221e,2026-07-15,09:50,10:07,Long,,Scratch,2.3,,N,Y,NY AM
+39d4ff812d0980a0ad31f49afbd637c3,2026-07-15,10:40,10:42,Long,,Loss,-1,,N,Y,NY AM
+39d4ff812d0980c48ad2ff389a625548,2026-07-15,21:46,22:36,Long,,Win,2.1,,Y,Y,Asian
+39f4ff812d09801cbfc7cc74c75f3ee5,2026-07-16,03:35,03:40,Long,,Loss,-1,,N,Y,London
+39f4ff812d098070997aee45f101bb20,2026-07-16,11:30,15:45,Short,,Scratch,3,,Y,Y,NY AM
+3a04ff812d098033b7b6eb2ab1be9b57,2026-07-16,20:44,20:56,Long,,Win,1.2,,Y,Y,Asian
+3a04ff812d098004901fd3fa31d09e34,2026-07-16,23:25,00:10,Short,,Scratch,3,,Y,Y,Asian
+3a14ff812d0980848ceded3586b0c50d,2026-07-17,13:00,15:15,Short,,Win,1,,Y,Y,NY PM
+3a14ff812d09806aa7f8c8911544c5f7,2026-07-17,15:20,15:31,Long,,Scratch,1.1,,Y,Y,NY PM
+3a34ff812d098083804bf70f96ec7e9e,2026-07-20,04:05,0:50,Short,,Scratch,2,,N,Y,London
+3a34ff812d098062971cf2d2f4316b9d,2026-07-20,09:50,09:53,Short,,Win,0.64,,N,Y,NY AM
+3a34ff812d0980c09bf4c4fe531fa8c8,2026-07-20,11:00,11:10,Long,,Win,1.66,,N,Y,NY AM
+3a44ff812d098055a11ee2a22e6864ea,2026-07-21,06:15,07:24,Short,,Win,1,,N,Y,London
+3a44ff812d098094b795fd39991c111c,2026-07-21,08:10,08:36,Short,,Scratch,1.5,,N,Y,NY AM
+3a44ff812d098018a2f2f9afa24954b7,2026-07-21,08:45,09:25,Long,,Scratch,1.26,,Y,Y,NY AM
+3a44ff812d09805196d8c436e23b68c8,2026-07-21,09:56,09:59,Long,,Scratch,2.2,,Y,Y,NY AM
+3a54ff812d09801a835ec6a65d8667a6,2026-07-22,03:45,06:03,Long,,Scratch,2.9,,N,Y,London
+3a54ff812d098013bdeee8ffea5e03f3,2026-07-22,07:45,07:48,Long,,Win,0.7,,N,Y,London
+3a54ff812d0980698c22e2a700842a8f,2026-07-22,11:25,14:15,Short,,Win,1.5,,Y,Y,NY AM
+3a64ff812d09808a805ce2671e3dc893,2026-07-22,19:05,20:25,Long,,Scratch,4.6,,Y,Y,Asian
+3a64ff812d0980cc99afd5f18f6cd99f,2026-07-23,08:20,08:30,Long,,Loss,-1,,N,Y,NY AM
+3a64ff812d0980debc85d2cd5225497e,2026-07-23,15:10,16:01,Long,,Scratch,1.73,,Y,Y,NY PM
+3a74ff812d0980109274faf59bbfdc05,2026-07-24,04:40,05:40,Short,,Loss,-1,,Y,Y,London
+3aa4ff812d0980ecbd29fe1c37fb6519,2026-07-27,07:00,08:22,Short,,Scratch,3.15,Consolidation,Y,Y,NY AM
+3aa4ff812d0980b18565d252d430b58d,2026-07-27,10:07,10:10,Long,,Loss,-0.25,Crash/Pump,N,Y,NY AM
+3aa4ff812d09805db724e95c2e137f96,2026-07-27,14:08,14:40,Short,,Breakeven,1.3,Consolidation,Y,Y,NY PM
+3ab4ff812d0980ada471ee7726c5c833,2026-07-27,20:05,20:26,Short,,Win,2.94,Slow selloff/Pump,Y,Y,Asian
+3ab4ff812d0980179775fccb4df81f10,2026-07-28,12:22,13:47,Short,,Win,0.9,Consolidation,N,Y,NY PM
+3ac4ff812d09805dac8dd6e9955a61db,2026-07-28,20:20,21:55,Short,,Scratch,6,Consolidation,Y,N,Asian
+3ac4ff812d0980e584b3d7789dd07171,2026-07-28,22:35,23:50,Short,,Scratch,2.5,Break and Retest,Y,Y,Asian
+3ac4ff812d098007be35f4138461d5f1,2026-07-29,09:35,09:56,Short,,Scratch,4,Slow selloff/Pump,Y,Y,NY AM
+3ad4ff812d0980899d36d7a156c11b1a,2026-07-30,10:10,10:29,Long,,Scratch,1.5,Break and Retest,Y,N,NY AM
+3ad4ff812d0980e0b2a5e07b6229b421,2026-07-30,12:15,12:40,Short,,Win,1.4,Consolidation,N,Y,NY PM
+3ad4ff812d0981e4a2a0e699d7c6d6e2,2026-07-30,12:15,15:08,Short,,Loss,-1,Consolidation,N,Y,NY PM
+3ae4ff812d0980339e4df56bdf5ef317,2026-07-31,07:10,07:18,Short,,Scratch,3.5,Consolidation,N,Y,NY AM
+3ae4ff812d098080a315c77d1c1cc4b9,2026-07-31,08:45,09:20,Long,,Win,0.8,Consolidation,Y,Y,NY AM
+3ae4ff812d0980be8803c88805608bca,2026-07-31,10:17,10:47,Long,,Scratch,1.5,Crash/Pump,N,Y,NY AM
+3ae4ff812d0980c2a09ce88efa0a9c99,2026-07-31,10:50,11:25,Short,,Scratch,3.5,Break and Retest,Y,N,NY AM
+3ae4ff812d098007a49dc8eac64d882c,2026-07-31,13:06,13:24,Short,,Loss,-1,Slow selloff/Pump,N,N,NY PM
+3b14ff812d0980188760fb0eb5261e28,2026-08-03,09:45,09:55,Short,30-75,Loss,-1,Crash/Pump,N,Y,NY AM
+3b14ff812d098011b836da73857a574a,2026-08-03,10:05,10:19,Long,30-75,Win,2.4,Break and Retest,Y,Y,NY AM
+3b44ff812d0980239951f3fd43831a5a,2026-08-06,07:45,08:15,Short,30-75,Scratch,3,Slow selloff/Pump,Y,Y,NY AM
+3b44ff812d098014befecca8cda881ed,2026-08-06,09:40,09:45,Short,10-30,Loss,-1,Crash/Pump,N,Y,NY AM
+3b44ff812d0980c899fdccde3b229cc0,2026-08-06,09:55,10:07,Short,30-75,Loss,-1,Crash/Pump,N,Y,NY AM
+3b94ff812d0980f2b330d5577015dba7,2026-08-11,09:21,09:30,Long,30-75,Loss,-1,Consolidation,Y,Y,NY AM
+3b94ff812d098005ace9e5304a9db5ab,2026-08-11,09:50,09:59,Long,450-600,Win,1,Crash/Pump,N,Y,NY AM
+3bb4ff812d098020af04c485b3bac860,2026-08-13,07:05,08:17,Short,30-75,Breakeven,0,Slow selloff/Pump,Y,Y,NY AM
+3c64ff812d0980518b9fc857708dde34,2026-08-24,11:50,15:53,Short,10-30,Win,0.9,Slow selloff/Pump,Y,Y,NY AM
+3c74ff812d0980f4b18dd2d18f0aa802,2026-08-24,19:45,20:47,Short,0-10,Win,1.4,Slow selloff/Pump,Y,Y,Asian
+3c74ff812d0980469e22c511c7dfc0fb,2026-08-25,10:20,10:30,Long,30-75,Loss,-1,Crash/Pump,Y,Y,NY AM
+3c84ff812d098032bbccf9a9f2fc84b8,2026-08-25,19:55,20:00,Long,,Loss,-1,Crash/Pump,N,Y,Asian
+3c84ff812d0980f4bff5c7f63331276f,2026-08-26,07:20,07:35,Short,75-150,Win,1.8,Slow selloff/Pump,N,Y,NY AM
+3c84ff812d0980efbae0df0ff94e9910,2026-08-26,08:55,09:31,Long,75-150,Win,1,Slow selloff/Pump,N,Y,NY AM
+3c84ff812d0980d9982bfee398363f82,2026-08-26,10:30,11:50,Long,10-30,Win,1,Consolidation,Y,Y,NY AM
+3c84ff812d0980278e8ce7bd436889f4,2026-08-26,14:00,15:00,Short,30-75,Loss,-1,Slow selloff/Pump,N,Y,NY PM
+3c84ff812d0980579fdff316ae3d8635,2026-08-26,15:10,18:00,Long,30-75,Win,0.1,Break and Retest,Y,Y,NY PM
+3c84ff812d0980dca6b0f26e0430962c,2026-08-26,9:35,09:40,Short,150-300,Win,1,Crash/Pump,N,N,NY AM
+3c94ff812d0980a9b0e3f17743bf8197,2026-08-27,07:15,07:50,Short,10-30,Scratch,2.07,Slow selloff/Pump,N,Y,NY AM
+3c94ff812d0980d79d49d3511ee79e56,2026-08-27,07:55,08:45,Long,30-75,Breakeven,0,Crash/Pump,Y,Y,NY AM
+3c94ff812d09804f9de3ea79a06e3bca,2026-08-27,09:15,09:30,Short,10-30,Breakeven,0,Slow selloff/Pump,N,Y,NY AM
+3c94ff812d0980cbbc75ddd28d31f697,2026-08-27,09:40,09:45,Short,10-30,Loss,-1,Crash/Pump,N,Y,NY AM
+3c94ff812d0980919c6cc13f7a090521,2026-08-27,09:45,09:46,Short,30-75,Win,1,Consolidation,N,Y,NY AM
+3c94ff812d09805cb445c03919a04364,2026-08-27,09:53,08:57,Short,30-75,Win,1.2,Consolidation,N,Y,NY AM
+3c94ff812d098028a795f9fc1b05bf36,2026-08-27,14:30,15:51,Long,30-75,Scratch,3.82,Crash/Pump,Y,Y,NY PM
+3cc4ff812d0980b1b0ddcecf870054a9,2026-08-30,18:10,18:05,Long,10-30,Win,0.4,Slow selloff/Pump,Y,Y,Asian
+3cc4ff812d0980e6bff6e4f2ae24bf29,2026-08-30,18:25,19:04,Short,0-10,Win,1.5,Break and Retest,Y,Y,Asian
+3cc4ff812d098080b205cf49fdf1b093,2026-08-30,19:35,19:41,Long,450-600,Loss,-1,Crash/Pump,N,Y,Asian
+3cd4ff812d0980ae8a83d36d8f00ac49,2026-08-30,22:40,23:11,Long,600-750,Scratch,2.58,Slow selloff/Pump,N,N,Asian
+3cd4ff812d098022a726c799ca68eb0d,2026-08-31,09:35,09:37,Short,30-75,Win,1.2,Slow selloff/Pump,N,Y,NY AM
+3cd4ff812d0980c5af3fcb4ac14ea1cd,2026-08-31,12:10,13:15,Short,0-10,Loss,-2,Slow selloff/Pump,Y,Y,NY PM
+3ce4ff812d0980d79805f6c4197f33d6,2026-09-01,08:40,09:01,Long,750+,Loss,-1,Crash/Pump,N,Y,NY AM
+3ce4ff812d0980bdbe4ec1f13eff6a85,2026-09-01,09:55,10:23,Short,10-30,Loss,-1,Slow selloff/Pump,Y,Y,NY AM
+3ce4ff812d09803a8375ea0d96235453,2026-09-01,12:25,12:30,Long,30-75,Loss,-1,Break and Retest,N,N,NY PM
+3ce4ff812d098037a3f9eaccfc152d09,2026-09-01,14:00,,Short,0-10,Scratch,5.5,Slow selloff/Pump,Y,Y,NY PM
+3ce4ff812d09803d8faaeea4f2787f8e,2026-09-01,14:50,16:00,Long,750+,Scratch,1.3,Crash/Pump,N,Y,NY PM
+3cf4ff812d098004b356f424b4db13fe,2026-09-01,19:30,20:06,Long,0-10,Loss,-1,Consolidation,Y,Y,Asian
+3cf4ff812d0980dc973dd47079d8ebeb,2026-09-02,08:10,08:20,Short,75-150,Loss,-1,Slow selloff/Pump,Y,Y,NY AM
+3cf4ff812d098046b8f9e0f5f6487eea,2026-09-02,10:55,11:19,Long,75-150,Win,1.4,Break and Retest,Y,N,NY AM
+3d04ff812d09804588acce33982b24c5,2026-09-02,20:20,21:17,Long,30-75,Win,1.2,Slow selloff/Pump,Y,Y,Asian
+3d04ff812d0980a39cb2dcd064c947b0,2026-09-02,21:30,,Long,0-10,Win,0.1,Crash/Pump,Y,Y,Asian
+3d04ff812d098050b0dcf290e3c50b87,2026-09-02,21:50,21:58,Long,0-10,Loss,-1,Crash/Pump,Y,Y,Asian
+3d04ff812d09804caab2e806ae392ec8,2026-09-02,22:05,22:10,Short,0-10,Loss,-1.5,Slow selloff/Pump,Y,Y,Asian
+3d04ff812d0980b891bbe5015d7724de,2026-09-03,07:35,08:30,Long,0-10,Win,1,Crash/Pump,Y,Y,NY AM
+3d04ff812d09805d89c8f4f0e13db31e,2026-09-03,10:10,10:20,Long,0-10,Win,1.3,Slow selloff/Pump,Y,Y,NY AM
+3d04ff812d0980ac8468cf01a329cb8e,2026-09-03,11:30,,Short,600-750,Win,0.2,Crash/Pump,N,N,NY AM
+3d14ff812d09804da661e36466bf6ff4,2026-09-03,18:10,20:45,Long,10-30,Win,1.5,Consolidation,Y,Y,Asian
+3d14ff812d0980eabe49ffc9589269de,2026-09-03,22:35,00:36,Short,75-150,Loss,-1,Slow selloff/Pump,N,Y,Asian
+3d14ff812d09809ea070fa97c72321b6,2026-09-04,09:35,10:45,Short,10-30,Win,1,Crash/Pump,N,Y,NY AM
+3d44ff812d09809aa4b1cc2287762724,2026-09-06,19:40,20:00,Short,0-10,Win,1.8,Slow selloff/Pump,N,Y,Asian
+3d54ff812d0980e7957deaadea0c16bb,2026-09-07,19:20,19:44,Long,150-300,Win,1.8,Slow selloff/Pump,N,Y,Asian
+3d54ff812d09800b9821ee0b3fb35643,2026-09-07,20:05,20:29,Short,10-30,Loss,-1,Consolidation,N,Y,Asian
+3d54ff812d09808988adcacec7a820ae,2026-09-08,09:35,09:41,Long,10-30,Loss,-1.3,Crash/Pump,N,Y,NY AM
+3d54ff812d0980a99bc9f1162cd7d020,2026-09-08,10:55,11:13,Short,30-75,Loss,-1,Break and Retest,N,N,NY AM
+3d54ff812d098095a4c8ea7ce7f0e924,2026-09-08,12:30,13:02,Short,0-10,Loss,-0.9,Slow selloff/Pump,Y,Y,NY PM
+3d54ff812d09806987c8fa4cfcc5d457,2026-09-08,14:20,15:54,Short,0-10,Scratch,3.85,Slow selloff/Pump,Y,Y,NY PM
+3d54ff812d098006844edac95535004f,2026-09-08,14:55,15:54,Long,0-10,Scratch,1.9,Slow selloff/Pump,Y,Y,NY PM
+3d64ff812d098092a1fbe95872c2a05d,2026-09-09,10:00,10:19,Short,30-75,Win,2.5,Crash/Pump,Y,Y,NY AM
+3d74ff812d0980daa9d6ce5148b8fbdf,2026-09-09,21:35,00:50,Long,75-150,Win,3,Crash/Pump,N,N,Asian
+3d74ff812d098066882cf10733594e26,2026-09-10,12:50,19:55,Short,10-30,Scratch,2.6,Slow selloff/Pump,Y,Y,NY PM
+3d84ff812d0980a4aec3e958ad337a57,2026-09-10,20:05,20:06,,0-10,Loss,-1,Crash/Pump,Y,Y,Asian
+3d84ff812d0980168cfeea88c87d24ea,2026-09-10,20:15,20:27,Long,0-10,Win,2.2,Break and Retest,N,Y,Asian
+3d84ff812d0980b8951bccc5a58ec6f4,2026-09-10,20:30,20:35,Short,10-30,Breakeven,0,Slow selloff/Pump,Y,Y,Asian
+3db4ff812d098067b5d0da1606ba4d1f,2026-09-14,08:40,08:50,Long,30-75,Breakeven,0,Slow selloff/Pump,N,Y,NY AM
+3db4ff812d0980b19756e800d6d5c47c,2026-09-14,09:10,09:45,Long,750+,Scratch,4.5,Slow selloff/Pump,N,Y,NY AM
+3db4ff812d09809e9f1ed9c24225d1aa,2026-09-14,09:55,10:01,Long,75-150,Win,0.3,Break and Retest,Y,Y,NY AM
+3db4ff812d09801e97eff4a81da95e3c,2026-09-14,10:15,10:26,Short,150-300,Win,2.2,Slow selloff/Pump,Y,Y,NY AM
+3db4ff812d098076933ac097facdfa58,2026-09-14,10:40,10:55,Long,30-75,Breakeven,0,Break and Retest,Y,Y,NY AM
+3dc4ff812d09801b913af8305a6c168b,2026-09-14,21:00,21:34,Long,0-10,Scratch,0,Slow selloff/Pump,Y,Y,Asian
+3dc4ff812d098095b0cee7a1f2ad7e75,2026-09-15,09,09:09,Long,0-10,Win,0.25,Slow selloff/Pump,Y,Y,NY AM
+3dc4ff812d09800e9c0cedac6e3510e3,2026-09-15,10:55,11:02,Long,150-300,Win,0.2,Crash/Pump,N,N,NY AM
+3dc4ff812d098094aeffe48406c53732,2026-09-15,15:40,07:00,Long,300-450,Scratch,4.5,Consolidation,N,N,NY PM
+3dd4ff812d098063b78dc3e0e4acddd1,2026-09-16,07:05,09:46,Short,150-300,Loss,-0.3,Slow selloff/Pump,N,Y,NY AM
+3dd4ff812d0980788834d8bdb63d0561,2026-09-16,11:50,13:44,Short,450-600,Scratch,2.4,Slow selloff/Pump,N,N,NY AM
+3de4ff812d0980458c47c97c0f4f265f,2026-09-16,19:20,03:10,Short,30-75,Loss,-1,Crash/Pump,Y,Y,Asian
+3de4ff812d0980f69ce5d07b25d92751,2026-09-17,11:30,13:00,Short,10-30,Loss,-1,Consolidation,N,Y,NY AM
+3de4ff812d098042b4b8d3a70b5c600e,2026-09-17,18:20,20:39,Long,30-75,Loss,-1,Slow selloff/Pump,Y,Y,Asian
+3df4ff812d0980aabe72c49311676e4d,2026-09-17,22:44,23:05,Short,10-30,Loss,-1,Crash/Pump,N,Y,Asian
+3df4ff812d0980f5a972da90752e6577,2026-09-18,07:45,08:06,Long,30-75,Loss,-1,Consolidation,Y,Y,NY AM
+3df4ff812d0980788e98e0cf19a9ab96,2026-09-18,09:35,10:16,Short,10-30,Scratch,2.5,Slow selloff/Pump,Y,Y,NY AM
+3df4ff812d0980378bacde5a84f4fa58,2026-09-18,10:20,,Long,75-150,Loss,-1,Slow selloff/Pump,N,Y,NY AM
+3df4ff812d098052ac30ebce2b705926,2026-09-18,12:34,12:42,Short,10-30,Scratch,0,Crash/Pump,Y,Y,NY PM
+3e54ff812d098086a638c7c04ef81dfb,2026-09-21,18:00,,Short,300-450,Scratch,0,Crash/Pump,N,Y,
+3e34ff812d0980039f74e6698caa07b6,2026-09-22,10:15,10:42,Short,750+,Win,0.8,Slow selloff/Pump,N,N,NY AM
+3e34ff812d0980cabcd4decef8098f1d,2026-09-22,14:05,14:23,Long,0-10,Scratch,1.7,Slow selloff/Pump,Y,Y,NY PM
+3e44ff812d0980668805c45050e4810d,2026-09-22,21:10,21:29,Short,0-10,Scratch,-1,Slow selloff/Pump,N,Y,Asian
+3e44ff812d09807ba8a1dcbd50656673,2026-09-22,22:17,02:05,Long,75-150,Scratch,2.4,Slow selloff/Pump,Y,Y,Asian
+3e44ff812d0980d1b239ef0056ff9368,2026-09-23,07:40,08:15,Long,150-300,Breakeven,0,Crash/Pump,N,Y,NY AM
+3e54ff812d0980e19a8dcce8c4847ea5,2026-09-23,20:50,21:50,Long,30-75,Breakeven,0,Slow selloff/Pump,Y,Y,Asian
+3e54ff812d098047a173eceec36b57ac,2026-09-24,07:45,08:33,Long,10-30,Breakeven,0,Slow selloff/Pump,N,Y,NY AM
+3e54ff812d0980878505d911fb01ca46,2026-09-24,09:50,10:35,Short,30-75,Scratch,-1,Slow selloff/Pump,N,Y,NY AM
+3e54ff812d09800cb2a6d2b323f48c5a,2026-09-24,12:50,13:26,Short,150-300,Scratch,1.8,Crash/Pump,N,Y,NY PM
+3e64ff812d098072abd2c169c946599b,2026-09-24,18:05,21:11,Short,10-30,Breakeven,0,Consolidation,Y,Y,Asian
+3e64ff812d098040844ed15a4d8250df,2026-09-25,10:10,10:14,Long,75-150,Loss,-1,Crash/Pump,Y,N,NY AM
+3e64ff812d0980b59056e2b1f50240fe,2026-09-25,10:20,,Long,150-300,Win,3.45,Slow selloff/Pump,N,Y,NY AM
+3e94ff812d09808a9746c80be3437737,2026-09-27,18:55,20:12,Long,30-75,Win,1.7,Slow selloff/Pump,Y,Y,Asian
+3e94ff812d0980f3a0abf5a2b7701463,2026-09-27,22:25,22:30,Long,150-300,Scratch,0,Crash/Pump,N,Y,Asian
+3e94ff812d0980cfb4a5d2b4b5ec15b3,2026-09-28,10:15,10:22,Long,450-600,Scratch,3.3,Crash/Pump,N,Y,NY AM
+3e94ff812d0980568371ed702155c3f8,2026-09-28,11:00,11:07,Short,600-750,Loss,-1,Break and Retest,Y,N,NY AM
+3ea4ff812d09806abfcbe91e549970e0,2026-09-29,10:20,11:46,Short,10-30,Win,1.5,Slow selloff/Pump,Y,Y,NY AM
+3ea4ff812d0980f6bf17fba6445ddfbc,2026-09-29,18:10,20:08,Short,300-450,Scratch,-1,Crash/Pump,Y,N,Asian
+3eb4ff812d098019aeb0cadcd396f25d,2026-09-29,21:15,22:10,Long,30-75,Loss,-1,Slow selloff/Pump,Y,Y,Asian
+3eb4ff812d0980ff97bdc27ac4a9cd6f,2026-09-29,22:20,22:38,Short,30-75,Scratch,2.3,Break and Retest,Y,Y,Asian
+3eb4ff812d0980cebefed74de6071cd4,2026-09-30,07:15,08:15,Long,150-300,Win,0.4,Slow selloff/Pump,Y,Y,NY AM
+3eb4ff812d0980e0be84d45360124886,2026-09-30,10:15,10:23,Long,600-750,Scratch,0,Slow selloff/Pump,Y,N,NY AM
+3eb4ff812d0980a98109e9ad6f855518,2026-09-30,13:55,14:13,Short,0-10,Scratch,0,Slow selloff/Pump,N,Y,NY PM
+3eb4ff812d0980648adad92d7ef8443e,2026-09-30,19:40,20:18,Short,30-75,Win,1.7,Slow selloff/Pump,Y,Y,Asian
+3ec4ff812d09803a945afce19021bd39,2026-09-30,21:00,21:10,Short,0-10,Loss,1,Crash/Pump,N,Y,Asian
+3ec4ff812d0980f1b54ff604cca689d6,2026-10-01,10:25,11:01,Long,150-300,Scratch,0,Crash/Pump,Y,Y,NY AM
+3ed4ff812d0980f8ba7fcef83768f671,2026-10-01,19:40,19:53,Long,10-30,Win,1.95,Slow selloff/Pump,Y,Y,Asian
+3ed4ff812d0980b2af0cde53ef52ce9d,2026-10-01,21:35,22:49,Long,30-75,Scratch,3.8,Slow selloff/Pump,Y,N,Asian
+3ed4ff812d0980aa9f3ccb043c9fd889,2026-10-02,11:30,21:40,Long,30-75,Scratch,0,Break and Retest,Y,Y,NY AM
+3f04ff812d0980619525d2e8388af9df,2026-10-05,07:30,08:48,Short,30-75,Scratch,2.1,Slow selloff/Pump,Y,Y,NY AM
+3f04ff812d09800590fdccc363be4591,2026-10-05,08:50,09:33,Long,10-30,Scratch,5,Consolidation,Y,Y,NY AM
+3f14ff812d0980f7a177fe9d9e2236dc,2026-10-05,21:45,22:33,Long,30-75,Loss,-1,Crash/Pump,Y,Y,Asian
+3f24ff812d098022a4c3c259a671a340,2026-10-06,20:30,21:30,Short,30-75,Scratch,0,Consolidation,N,N,Asian
+3f24ff812d0980dbbe0aeeee62dc2e3f,2026-10-06,21:30,22:04,Short,10-30,Scratch,2.84,Consolidation,N,Y,Asian
+3f24ff812d0980089d71c188bf8f19e3,2026-10-07,10:55,11:10,Long,0-10,Win,1.41,Consolidation,Y,Y,NY AM
+3f24ff812d0980629463f91b9cefab6d,2026-10-07,16:00,,Short,75-150,Scratch,,Slow selloff/Pump,N,Y,NY PM
+3f44ff812d0980868006d447d86d06e4,2026-10-09,07:00,07:23,Short,10-30,Scratch,-1,Consolidation,N,Y,NY AM
+3f44ff812d09800e9f1df066a275ad46,2026-10-09,09:50,14:50,Long,75-150,Scratch,0,Crash/Pump,N,Y,NY AM
+3f44ff812d09803ba552db8c88984622,2026-10-09,14:55,15:59,Short,75-150,Scratch,0,Break and Retest,N,N,NY PM
+3f74ff812d0980f79638d23635565bb3,2026-10-11,18:30,19:20,Short,75-150,Loss,-1,Slow selloff/Pump,Y,Y,Asian
+3f74ff812d0980f08d10cb387ad8dcd3,2026-10-11,21:00,21:05,Long,10-30,Win,0.8,Slow selloff/Pump,Y,Y,Asian
+3f84ff812d09804fb63cc86d5fcc901d,2026-10-13,11:30,12:19,Long,10-30,Win,0.7,Slow selloff/Pump,Y,Y,NY AM
+3f74ff812d0980d5a86edb02b2519525,2026-10-13,21:05,21:10,Short,0-10,Scratch,1.5,Slow selloff/Pump,Y,Y,Asian
+3fb4ff812d09808d8cb0e0ebf775d074,2026-10-15,14:25,15:15,Long,10-30,Scratch,3.9,Slow selloff/Pump,N,Y,NY PM
+3fb4ff812d0980779ad8f21f2348b4de,2026-10-15,20:15,20:22,Short,10-30,Scratch,2.86,Slow selloff/Pump,Y,Y,Asian
+3fb4ff812d0980098130c6bab05b1052,2026-10-15,20:25,20:50,Long,30-75,Win,0.7,Slow selloff/Pump,Y,Y,Asian
+3fb4ff812d098027aa03f67b227d142f,2026-10-15,20:55,20:59,Short,10-30,Breakeven,0,Slow selloff/Pump,Y,Y,Asian
+3fb4ff812d098025a96df5fd2f58ccd7,2026-10-15,22:40,23:35,Short,450-600,Scratch,1.85,Slow selloff/Pump,Y,Y,Asian
+3fb4ff812d0980f080d0ef925ce47266,2026-10-16,13:45,14:03,Short,750+,Scratch,2.5,Slow selloff/Pump,Y,Y,NY PM
