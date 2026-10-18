@@ -22,6 +22,9 @@ after a payout the floor moves to the starting balance (balance cannot go below
 zero profit). Fees: eval per month, activation. Edit PLANS to match the firm.
 
 Usage (repo folder):  python3 prop_sim.py DATA_DIR [--stop-rule] [--plan NAME] [--hold] [--no-consistency]
+                      python3 prop_sim.py --trades research/vwap_trades_primary.csv [--plan NAME]
+  --trades CSV      run the plans on an intraday trade file (columns session, R_unit, pnl_usd) instead of the
+                    trendline bot; each trade is one day's P&L per contract
   --hold            hold through the close and weekends (a swing plan), no forced flat or re entries
   --no-consistency  ignore the consistency rule for passing and payouts (ceiling test)
 Writes research/prop_report.md.
@@ -31,12 +34,15 @@ from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 import numpy as np
 
-from research_exits import harvest, features, exit_engine, rolling_extreme
-from research_model import TICK_FIX
-from research_v3 import TierScorer
-from batch_backtest import build_catalog, iso
-from backtest_hull import load_series
 from instruments import TICKS
+try:                                   # the trendline bot path needs the research modules; --trades does not
+    from research_exits import harvest, features, exit_engine, rolling_extreme
+    from research_model import TICK_FIX
+    from research_v3 import TierScorer
+    from batch_backtest import build_catalog, iso
+    from backtest_hull import load_series
+except ImportError:
+    harvest = None
 
 OUT = "research"
 WARMUP_DAYS = 60
@@ -212,13 +218,23 @@ def main():
     args = sys.argv[1:]
     if not args: sys.exit("usage: python3 prop_sim.py DATA_DIR [--stop-rule] [--plan NAME]")
     stop_rule = "--stop-rule" in args
+    trades_csv = args[args.index("--trades") + 1] if "--trades" in args else None
     global FLAT_AT_CLOSE
     if "--hold" in args: FLAT_AT_CLOSE = False
     if "--no-consistency" in args:
         for P in PLANS.values(): P["consistency_eval"] = P["consistency_payout"] = 1.0
     plans = [args[args.index("--plan") + 1]] if "--plan" in args else list(PLANS)
-    cat = build_catalog(args[0])
-    trades = build_trades(cat, list(MICROS), stop_rule)
+    if trades_csv:
+        trades = []
+        for r in csv.DictReader(open(trades_csv)):
+            d = datetime.strptime(r["session"], "%Y-%m-%d").date(); pnl = float(r["pnl_usd"])
+            trades.append(dict(symbol=r["symbol"], micro=r.get("micro", ""), entry_day=d, R_unit=float(r["R_unit"]),
+                               pnl_day={d: pnl}, path_day={d: [(pnl, min(0.0, pnl))]}))
+        trades.sort(key=lambda x: x["entry_day"])
+        print(f"{len(trades)} trades from {trades_csv}")
+    else:
+        cat = build_catalog(args[0])
+        trades = build_trades(cat, list(MICROS), stop_rule)
     days = sorted({tr["entry_day"] for tr in trades if tr["entry_day"].year >= START_YEAR})
     all_days = []
     d = days[0]
@@ -227,7 +243,7 @@ def main():
         d += timedelta(days=1)
     starts = all_days[::5]                                     # one eval start a week
     os.makedirs(OUT, exist_ok=True)
-    L = [f"# Prop firm simulation: v2{' + stop rule' if stop_rule else ''} on CME micros"
+    L = [f"# Prop firm simulation: {os.path.basename(trades_csv) if trades_csv else 'v2' + (' + stop rule' if stop_rule else '')} on CME micros"
          f"{' (holding through closes and weekends)' if not FLAT_AT_CLOSE else ''}"
          f"{' (no consistency rule)' if '--no-consistency' in args else ''}\n",
          f"{len(trades)} trades on {len(set(t['symbol'] for t in trades))} instruments, {len(starts)} eval start dates "
