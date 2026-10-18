@@ -28,10 +28,11 @@ Variants recorded per trade and applied afterwards (every combination is a confi
             (EMA gates were rejected by Adam before; "with trend" in the log is his own read)
   parabolic off | no continuation entry while the trading tf close is > 3.5 ATR from its 21 EMA
             in the trade's direction, cleared at 2 ATR (shorts at supply after a pump stay allowed)
-  session   all | NY AM only (09:30 to 12:00 ET) | all but NY PM (12:00 to 16:45 ET)
+  session   all | NY AM only (09:30 to 12:00 ET) | all but NY PM (12:00 to 16:45 ET) | ex_hours (entry hours whose
+            exploration avgR is positive with 100+ trades for that config, chosen before validation and holdout)
 Every config is also scored flat at 16:45 ET of the entry session (prop firm version).
 
-Notion NQ trade log, taken trades 2026-07-02 to 2026-09-01 (128: 62 W, 54 L, 12 BE), avg +0.28R, no costs:
+Notion NQ trade log, taken trades 2026-07-03 to 2026-10-15 (128: 62 W, 54 L, 12 BE), avg +0.28R, t 2.4, no costs:
   with trend +0.50R (68) vs against 0.00R (60); NY AM +0.37 (61), Asian +0.34 (50), NY PM -0.32 (13), London (4)
   approach: slow +0.42 (43), consolidation +0.28 (16), break and retest +0.49 (10), crash/pump -0.16 (28)
   zone tf 5m in 127 of 128; fresh zone in 115 of 128.
@@ -66,9 +67,10 @@ SESSION_MIN = 23 * 60
 NY_AM, NY_PM = (9 * 60 + 30, 12 * 60), (12 * 60, FLAT_MIN)
 GRID = dict(spike=[2.0, 3.0], cons=[2.0, 3.0], approach=[1.5, 2.5])
 VARIANTS = dict(manage=["fixed", "be"], target=["nearest", "further", "rr1.5"], fresh=[0, 1], age=[0, 1],
-                bias=[0, 1, 2], parabolic=[0, 1], session=["all", "ny_am", "no_ny_pm"])
+                bias=[0, 1, 2], parabolic=[0, 1], session=["all", "ny_am", "no_ny_pm", "ex_hours"])
+MIN_HOUR_N = 100
 STATED = dict(spike=2.0, cons=2.0, approach=1.5, manage="be", target="nearest", fresh=1, age=0, bias=1, parabolic=1, session="all")
-LOG_WINDOW = ("2026-07-02", "2026-09-02")
+LOG_WINDOW = ("2026-07-02", "2026-10-16")
 MICROS = {"ES": ("MES", 5), "NQ": ("MNQ", 2), "RTY": ("M2K", 5), "YM": ("MYM", 0.5), "GC": ("MGC", 10), "SI": ("SIL", 1000),
           "HG": ("MHG", 2500), "CL": ("MCL", 100), "NG": ("QG", 2500), "E6": ("M6E", 12500), "A6": ("M6A", 10000),
           "B6": ("M6B", 6250), "J1": ("MJY", 1250000), "E1": ("MSF", 12500)}
@@ -238,6 +240,23 @@ def fmask(D, fresh, age, bias, parabolic, session, age_cap):
     return m
 
 
+def ex_hours(D, bv, r, ex_m):
+    """Entry hours (ET) with positive exploration avgR and MIN_HOUR_N+ trades for this base config -> (hour list, mask)."""
+    hour = (D[:, I["sessmin"]] // 60).astype(int); e = bv & ex_m
+    sums = np.bincount(hour[e], weights=r[e], minlength=24); cnt = np.bincount(hour[e], minlength=24)
+    keep = [h for h in range(24) if cnt[h] >= MIN_HOUR_N and sums[h] / cnt[h] > 0]
+    return keep, np.isin(hour, keep)
+
+
+def hour_table(L, D, r, m_ex, m_ho, label, b="holdout"):
+    hour = (D[:, I["sessmin"]] // 60).astype(int)
+    L += [f"\nBy entry hour (ET), {label}:\n", f"| hour | explore n | explore avgR | {b} n | {b} avgR |", "|---|---|---|---|---|"]
+    for h in range(24):
+        e = m_ex & (hour == h); o = m_ho & (hour == h)
+        if e.any() or o.any():
+            L.append(f"| {h:02d} | {e.sum()} | {r[e].mean() if e.any() else float('nan'):+.4f} | {o.sum()} | {r[o].mean() if o.any() else float('nan'):+.4f} |")
+
+
 def stats(r, mcode):
     if len(r) == 0: return dict(n=0, m=float("nan"), t=float("nan"), win=float("nan"))
     keys, inv = np.unique(mcode, return_inverse=True); K = len(keys)
@@ -255,7 +274,9 @@ def select(D, cfg, grid, age_cap):
     """Mask and per trade results (hold and flat) for one full config tuple."""
     spike, cons, appr, manage, target, fresh, age, bias, para, session = cfg
     valid, r, why, ov = outcome(D, manage, target, False); _, rf, _, _ = outcome(D, manage, target, True)
-    m = (D[:, I["cfg"]] == grid.index((spike, cons, appr))) & valid & fmask(D, fresh, age, bias, para, session, age_cap)
+    bv = (D[:, I["cfg"]] == grid.index((spike, cons, appr))) & valid
+    m = bv & fmask(D, fresh, age, bias, para, session, age_cap)
+    if session == "ex_hours": m &= ex_hours(D, bv, r, D[:, I["year"]] < EXPL_END)[1]
     return m, r, rf, why, ov
 
 
@@ -264,13 +285,17 @@ def score_tf(D, tf, syms, L):
     ex_m, va_m, ho_m = year < EXPL_END, (year >= EXPL_END) & (year < VAL_END), year >= VAL_END
     grid = list(itertools.product(GRID["spike"], GRID["cons"], GRID["approach"]))
     filt = [(f, fmask(D, *f, age_cap)) for f in itertools.product(VARIANTS["fresh"], VARIANTS["age"], VARIANTS["bias"], VARIANTS["parabolic"], VARIANTS["session"])]
+    # ex_hours masks depend on the base config: fmask treats the session as "all"; the hour mask is added per (grid, manage, target)
     configs = []
     for gi, g in enumerate(grid):
         base = D[:, I["cfg"]] == gi
         for manage, target in itertools.product(VARIANTS["manage"], VARIANTS["target"]):
             valid, r, why, ov = outcome(D, manage, target, False); _, rf, _, _ = outcome(D, manage, target, True); bv = base & valid
+            hmask = ex_hours(D, bv, r, ex_m)[1]
             for f, fm in filt:
-                m = bv & fm; e, v = m & ex_m, m & va_m
+                m = bv & fm
+                if f[4] == "ex_hours": m &= hmask
+                e, v = m & ex_m, m & va_m
                 configs.append(dict(cfg=(g[0], g[1], g[2], manage, target) + f, ex=stats(r[e], mcode[e]), exf=stats(rf[e], mcode[e]),
                                     va=stats(r[v], mcode[v]), vaf=stats(rf[v], mcode[v])))
     valid = [c for c in configs if c["ex"]["n"] >= 300]
@@ -288,10 +313,13 @@ def score_tf(D, tf, syms, L):
     if st:
         L.append(f"\nAdam's stated config {STATED}: explore {st['ex']['n']} trades avgR {st['ex']['m']:+.4f} (t {st['ex']['t']:.2f}, win {st['ex']['win']:.0f}%), "
                  f"validate {st['va']['n']} trades avgR {st['va']['m']:+.4f}; flat version {st['exf']['m']:+.4f} / {st['vaf']['m']:+.4f}.")
+        m_st, r_st, _, _, _ = select(D, st["cfg"], grid, age_cap)
+        hour_table(L, D, r_st, m_st & ex_m, m_st & va_m, "stated config (holdout not read)", "validate")
     chosen = None
     if top:
         chosen = max(top, key=lambda c: (c["va"]["m"] if c["va"]["n"] >= 50 else -9))
-        m, r, rf, why, ov = select(D, chosen["cfg"], grid, age_cap); m &= ho_m
+        m, r, rf, why, ov = select(D, chosen["cfg"], grid, age_cap)
+        hour_table(L, D, r, m & ex_m, m & ho_m, "chosen config"); m &= ho_m
         r, rf, why, ov = r[m], rf[m], why[m], ov[m]; H = D[m]
         s_, sf = stats(r, mcode[m]), stats(rf, mcode[m])
         L.append(f"\n**Chosen {cfg_label(chosen['cfg'])}: holdout 2017 to 2026, {s_['n']} trades, net avgR {s_['m']:+.4f}, t {s_['t']:.2f}, win {s_['win']:.0f}% "

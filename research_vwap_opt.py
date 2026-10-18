@@ -4,7 +4,9 @@ something: rank on 2008 to 2014, confirm on 2015 to 2016, test once on 2017 to
 2026.
 
 Grid: timeframe x entry band x stop distance x target x session filter x
-higher timeframe bias. Entry is a limit at the band (filled when touched),
+higher timeframe bias, plus an ex_hours session variant per config: the entry
+hours (ET) with positive exploration avgR and 100+ trades, chosen on exploration
+only. The report shows the chosen config by entry hour, exploration beside holdout. Entry is a limit at the band (filled when touched),
 levels from the previous bar's close, flat at 16:45 ET, no entries in the first
 60 minutes or the last 15. Bias: shorts only when the prior session closed
 below its VWAP, longs only when it closed above (fade with the prior day).
@@ -33,6 +35,7 @@ MIN_BAND_TICKS = 3
 WARMUP_MIN, FLAT_MIN, LAST_ENTRY_MIN = 60, 16 * 60 + 45, 16 * 60 + 30
 EXPL_END, VAL_END = 2015, 2017            # explore < 2015, validate 2015 to 2016, holdout >= 2017
 BOOT_REPS, SEED = 300, 13
+MIN_HOUR_N = 100
 MICROS = {"NG": ("QG", 2500), "GC": ("MGC", 10), "ES": ("MES", 5), "NQ": ("MNQ", 2), "CL": ("MCL", 100), "SI": ("SIL", 1000),
           "HG": ("MHG", 2500), "RTY": ("M2K", 5), "YM": ("MYM", 0.5), "E6": ("M6E", 12500), "A6": ("M6A", 10000),
           "B6": ("M6B", 6250), "J1": ("MJY", 1250000), "E1": ("MSF", 12500)}
@@ -162,6 +165,21 @@ def main():
         results.append(dict(cfg=(tf, k_in, k_add, target, session, bias), n_ex=len(ex), m_ex=np.mean([r["R"] for r in ex]) if ex else np.nan,
                             n_va=len(va), m_va=np.mean([r["R"] for r in va]) if va else np.nan, trades=tr, ho=ho))
         if ci % 25 == 0: print(f"{ci}/{len(combos)} configs, {time.time() - t0:.0f}s", flush=True)
+    # ex_hours variant: for each session=all config, keep the entry hours (ET) with positive exploration avgR and MIN_HOUR_N+ trades,
+    # chosen on exploration only, then applied to validation and holdout (a trade dropped this way frees no slot for a later one)
+    extra = []
+    for r in results:
+        if r["cfg"][4] != "all": continue
+        by = defaultdict(list)
+        for x in r["trades"]:
+            if int(x["session"][:4]) < EXPL_END: by[int(x["entry_time"][11:13])].append(x["R"])
+        hours = {h for h, v in by.items() if len(v) >= MIN_HOUR_N and np.mean(v) > 0}
+        tr = [x for x in r["trades"] if int(x["entry_time"][11:13]) in hours]
+        ex = [x for x in tr if int(x["session"][:4]) < EXPL_END]; va = [x for x in tr if EXPL_END <= int(x["session"][:4]) < VAL_END]
+        ho = [x for x in tr if int(x["session"][:4]) >= VAL_END]
+        extra.append(dict(cfg=r["cfg"][:4] + ("ex_hours",) + r["cfg"][5:], n_ex=len(ex), m_ex=np.mean([x["R"] for x in ex]) if ex else np.nan,
+                          n_va=len(va), m_va=np.mean([x["R"] for x in va]) if va else np.nan, trades=tr, ho=ho, hours=sorted(hours)))
+    results += extra
     valid = [r for r in results if r["n_ex"] >= 300 and np.isfinite(r["m_ex"])]
     n_pos_ex = sum(1 for r in valid if r["m_ex"] > 0); n_pos_va = sum(1 for r in valid if r["n_va"] >= 50 and r["m_va"] > 0)
     top = sorted(valid, key=lambda r: -r["m_ex"])[:10]
@@ -176,6 +194,17 @@ def main():
         L.append("| " + " | ".join(str(x) for x in r["cfg"]) + f" | {r['n_ex']} | {r['m_ex']:+.4f} | {r['n_va']} | {r['m_va']:+.4f} |")
     L += [f"\n## Chosen (best validation among the top 10): {dict(zip(names, chosen['cfg']))}\n",
           f"**Holdout {VAL_END} to 2026: {len(ho)} trades, net avgR {m:+.4f}, t {t:.2f} -> {'PASS' if (ho and m > 0 and t > 2.0) else 'no'}**\n"]
+    if chosen.get("hours") is not None: L.append(f"Entry hours kept (chosen on exploration): {chosen['hours']}\n")
+    by_h = defaultdict(lambda: ([], []))
+    for x in chosen["trades"]:
+        y = int(x["session"][:4]); h = int(x["entry_time"][11:13])
+        if y < EXPL_END: by_h[h][0].append(x["R"])
+        elif y >= VAL_END: by_h[h][1].append(x["R"])
+    L += ["By entry hour (ET), chosen config:\n", "| hour | explore n | explore avgR | holdout n | holdout avgR |", "|---|---|---|---|---|"]
+    for h in sorted(by_h):
+        e, o = by_h[h]
+        L.append(f"| {h:02d} | {len(e)} | {np.mean(e) if e else float('nan'):+.4f} | {len(o)} | {np.mean(o) if o else float('nan'):+.4f} |")
+    L.append("")
     if ho:
         for why in ("target", "stop", "time"):
             sub = [r for r in ho if r["why"] == why]
