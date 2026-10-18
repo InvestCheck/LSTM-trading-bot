@@ -18,11 +18,16 @@ log shows 5m zones in 127 of 128 taken trades):
   entry          next bar's open; stop = zone low - max(3 ticks, 0.15 ATR); 1R = entry - stop
   target         nearest live supply zone whose bottom is >= 1R away, 3R if none within 10R
 
-Simulated grid: SPIKE {2,3} x CONS {2,3} x APPROACH {1.5,2.5} ATR.
+Simulated grid, reset from the zone reconstruction of Adam's log (sd_zone_candidates.py, Oct 2026):
+SPIKE 2 x CONS {3, none} x APPROACH {2.2, 2.5} ATR. His zones: spike >= 2x in 76%, next bar continues 88%,
+base <= 3 ATR 82% (<= 2 ATR only 39%), no bar over 2.5 ATR into the zone 79% (over 1.5 ATR only 33%);
+crash/pump approaches (the losing label) have a max bar near 2.3 ATR vs 1.6 for slow ones. A zone must
+have been left by price before a rejection counts (the spike itself is not a retest).
 Variants recorded per trade and applied afterwards (every combination is a config):
   manage    fixed stop (reference page: the stop does not move) | stop to entry at +1R (verbal rule)
   target    nearest | further (second nearest zone) | rr1.5 (nearest zone if >= 1.5R, else further, else skip)
-  fresh     any tap | first touch only (reference page; 115 of 128 logged trades were fresh)
+  fresh     any | no wick back into the zone since price left it | no close back inside it (the log's
+            "fresh" matches the close definition: 111 of 123 marked fresh, only 42% untouched by wicks)
   age       any | zone younger than 2 sessions (reference page)
   bias      none | not both HTF (4h EMA50) and 15m EMA50 against (verbal rule) | HTF with
             (EMA gates were rejected by Adam before; "with trend" in the log is his own read)
@@ -36,9 +41,10 @@ Notion NQ trade log, taken trades 2026-07-03 to 2026-10-15 (128: 62 W, 54 L, 12 
   with trend +0.50R (68) vs against 0.00R (60); NY AM +0.37 (61), Asian +0.34 (50), NY PM -0.32 (13), London (4)
   approach: slow +0.42 (43), consolidation +0.28 (16), break and retest +0.49 (10), crash/pump -0.16 (28)
   zone tf 5m in 127 of 128; fresh zone in 115 of 128.
-The report also prints Adam's stated config (spike 2, cons 2, approach 1.5, BE at 1R, nearest target, fresh
-only, not both biases against, parabolic on, all sessions) on exploration and validation, and the engine's
-NQ trades over the log window for a side by side with the log (a two month peek at one instrument).
+The report prints the log derived config (spike 2, cons 3, approach 2.2, BE at 1R, nearest target, fresh by
+close, no EMA bias, parabolic on, all sessions) on exploration and validation; its holdout and the chosen
+config's holdout are printed only when exploration and validation are both positive (gate), since every
+year has been read before. The engine's NQ trades over the log window are listed for a side by side.
 
 Costs: COMM per side plus a tick on stop, BE and time exits. When a bar hits both the stop and a target the
 stop is taken (conservative; the bars are 5m or 15m so the order inside the bar is unknown). Explore 2008 to
@@ -65,18 +71,18 @@ BOOT_REPS, SEED = 300, 17
 FLAT_MIN = 16 * 60 + 45
 SESSION_MIN = 23 * 60
 NY_AM, NY_PM = (9 * 60 + 30, 12 * 60), (12 * 60, FLAT_MIN)
-GRID = dict(spike=[2.0, 3.0], cons=[2.0, 3.0], approach=[1.5, 2.5])
-VARIANTS = dict(manage=["fixed", "be"], target=["nearest", "further", "rr1.5"], fresh=[0, 1], age=[0, 1],
+GRID = dict(spike=[2.0], cons=[3.0, 99.0], approach=[2.2, 2.5])            # reset from the zone reconstruction of the log (Oct 2026)
+VARIANTS = dict(manage=["fixed", "be"], target=["nearest", "further", "rr1.5"], fresh=[0, 1, 2], age=[0, 1],
                 bias=[0, 1, 2], parabolic=[0, 1], session=["all", "ny_am", "no_ny_pm", "ex_hours"])
 MIN_HOUR_N = 100
-STATED = dict(spike=2.0, cons=2.0, approach=1.5, manage="be", target="nearest", fresh=1, age=0, bias=1, parabolic=1, session="all")
+STATED = dict(spike=2.0, cons=3.0, approach=2.2, manage="be", target="nearest", fresh=2, age=0, bias=0, parabolic=1, session="all")   # log derived
 LOG_WINDOW = ("2026-07-02", "2026-10-16")
 MICROS = {"ES": ("MES", 5), "NQ": ("MNQ", 2), "RTY": ("M2K", 5), "YM": ("MYM", 0.5), "GC": ("MGC", 10), "SI": ("SIL", 1000),
           "HG": ("MHG", 2500), "CL": ("MCL", 100), "NG": ("QG", 2500), "E6": ("M6E", 12500), "A6": ("M6A", 10000),
           "B6": ("M6B", 6250), "J1": ("MJY", 1250000), "E1": ("MSF", 12500)}
 SYMS = list(MICROS)
 COLS = ["sym", "cfg", "t", "dir", "R_px", "R_unit", "r_x", "why_x", "ov_x", "j_x", "r_t1", "j_t1", "ov_t1", "r_be", "j_be", "ov_be",
-        "r_flat", "j_flat", "tgt1_rr", "tgt2_rr", "taps", "age", "sessmin", "htf", "b15", "para"]
+        "r_flat", "j_flat", "tgt1_rr", "tgt2_rr", "taps", "age", "sessmin", "htf", "b15", "para", "cin"]
 I = {c: k for k, c in enumerate(COLS)}
 WHY = {0: "stop", 1: "target", 2: "end", 3: "target", 4: "be", 5: "flat"}
 
@@ -150,7 +156,7 @@ def simulate(sym_id, bars, tf, cfg_id, spike_mult, cons_atr, appr_atr, tick, mul
                     r(p["t1_px"]) if p["t1_j"] >= 0 else r(px), p["t1_j"] - p["i0"] if p["t1_j"] >= 0 else -1, p["t1_ov"],
                     r(p["be_px"]) if p["be_j"] >= 0 else r(px), p["be_j"] - p["i0"] if p["be_j"] >= 0 else -1, p["be_ov"],
                     r(p["flat_px"]) if p["flat_j"] >= 0 else r(px), p["flat_j"] - p["i0"] if p["flat_j"] >= 0 else -1,
-                    p["tgt1_rr"], p["tgt2_rr"], p["taps"], p["age"], mod[p["i0"]], p["htf"], p["b15"], p["para"]))
+                    p["tgt1_rr"], p["tgt2_rr"], p["taps"], p["age"], mod[p["i0"]], p["htf"], p["b15"], p["para"], p["cin"]))
 
     for j in range(60, n):
         a = A[j - 1] if A[j - 1] > 0 else 1e-12
@@ -160,7 +166,7 @@ def simulate(sym_id, bars, tf, cfg_id, spike_mult, cons_atr, appr_atr, tick, mul
         elif C[j] >= e21[j] - 2.0 * a: para_block[-1] = False
         # ---- pending entry fills at this open
         if pending is not None:
-            d, z, stop, taps, age = pending; pending = None
+            d, z, stop, taps, age, cin = pending; pending = None
             entry = O[j]; R = (entry - stop) * d
             if R > 0:
                 if d > 0: opp = sorted(x["lo"] for x in supply if entry + R <= x["lo"] <= entry + 10 * R)
@@ -168,7 +174,7 @@ def simulate(sym_id, bars, tf, cfg_id, spike_mult, cons_atr, appr_atr, tick, mul
                 tgt1 = opp[0] if opp else entry + d * 3 * R; tgt2 = opp[1] if len(opp) > 1 else tgt1
                 pos = dict(dir=d, entry=entry, stop=stop, R=R, tgt1=tgt1, tgt2=tgt2, tgt1_rr=(tgt1 - entry) * d / R, tgt2_rr=(tgt2 - entry) * d / R,
                            i0=j, sess=sess[j], armed=False, t1_j=-1, t1_px=0.0, t1_ov=0, be_j=-1, be_px=0.0, be_ov=0, flat_j=-1, flat_px=0.0,
-                           taps=taps, age=age, htf=float(htf[j]), b15=float(b15[j]), para=int(para_block[d]))
+                           taps=taps, age=age, cin=cin, htf=float(htf[j]), b15=float(b15[j]), para=int(para_block[d]))
         # ---- manage the position (events first, then the primary exit)
         if pos is not None:
             p = pos; d = p["dir"]; ov = int(sess[j] != p["sess"])
@@ -191,20 +197,26 @@ def simulate(sym_id, bars, tf, cfg_id, spike_mult, cons_atr, appr_atr, tick, mul
         demand = [z for z in demand if C[j] >= z["lo"] and z["hi"] >= C[j] - 30 * a]
         supply = [z for z in supply if C[j] <= z["hi"] and z["lo"] <= C[j] + 30 * a]
         for side, lo, hi in births.get(j, ()):
-            (demand if side > 0 else supply).append(dict(lo=lo, hi=hi, taps=0, born=j))
+            (demand if side > 0 else supply).append(dict(lo=lo, hi=hi, taps=0, cin=0, born=j, left=False))
         # ---- rejection at this bar (then count taps)
         if pos is None and pending is None and mod[j] < FLAT_MIN - 5 and rmax6[j] <= appr_atr * a:
             for z in sorted(demand, key=lambda z: -z["hi"]):
-                if L[j] <= z["hi"] and C[j] > z["hi"]:
-                    pending = (1, z, z["lo"] - max(3 * tick, 0.15 * a), z["taps"], j - z["born"]); break
+                if z["left"] and L[j] <= z["hi"] and C[j] > z["hi"]:
+                    pending = (1, z, z["lo"] - max(3 * tick, 0.15 * a), z["taps"], j - z["born"], z["cin"]); break
             if pending is None:
                 for z in sorted(supply, key=lambda z: z["lo"]):
-                    if H[j] >= z["lo"] and C[j] < z["lo"]:
-                        pending = (-1, z, z["hi"] + max(3 * tick, 0.15 * a), z["taps"], j - z["born"]); break
+                    if z["left"] and H[j] >= z["lo"] and C[j] < z["lo"]:
+                        pending = (-1, z, z["hi"] + max(3 * tick, 0.15 * a), z["taps"], j - z["born"], z["cin"]); break
         for z in demand:
-            if L[j] <= z["hi"]: z["taps"] += 1
+            if not z["left"]: z["left"] = L[j] > z["hi"]
+            elif L[j] <= z["hi"]:
+                z["taps"] += 1
+                if C[j] <= z["hi"]: z["cin"] += 1
         for z in supply:
-            if H[j] >= z["lo"]: z["taps"] += 1
+            if not z["left"]: z["left"] = H[j] < z["lo"]
+            elif H[j] >= z["lo"]:
+                z["taps"] += 1
+                if C[j] >= z["lo"]: z["cin"] += 1
     if pos is not None: close_out(pos, n - 1, C[n - 1] - pos["dir"] * tick, 2)
     return np.array(out, dtype=float).reshape(-1, len(COLS))
 
@@ -233,7 +245,8 @@ def fmask(D, fresh, age, bias, parabolic, session, age_cap):
     if bias == 1: m &= ~((D[:, I["htf"]] * d < 0) & (D[:, I["b15"]] * d < 0))
     elif bias == 2: m &= D[:, I["htf"]] * d > 0
     if parabolic: m &= D[:, I["para"]] == 0
-    if fresh: m &= D[:, I["taps"]] == 0
+    if fresh == 1: m &= D[:, I["taps"]] == 0
+    elif fresh == 2: m &= D[:, I["cin"]] == 0
     if age: m &= D[:, I["age"]] <= age_cap
     if session == "ny_am": m &= (sm >= NY_AM[0]) & (sm < NY_AM[1])
     elif session == "no_ny_pm": m &= ~((sm >= NY_PM[0]) & (sm < NY_PM[1]))
@@ -311,13 +324,24 @@ def score_tf(D, tf, syms, L):
     # Adam's stated config, exploration and validation only
     st = next((c for c in configs if cfg_label(c["cfg"]) == STATED), None)
     if st:
-        L.append(f"\nAdam's stated config {STATED}: explore {st['ex']['n']} trades avgR {st['ex']['m']:+.4f} (t {st['ex']['t']:.2f}, win {st['ex']['win']:.0f}%), "
+        L.append(f"\nLog derived config {STATED}: explore {st['ex']['n']} trades avgR {st['ex']['m']:+.4f} (t {st['ex']['t']:.2f}, win {st['ex']['win']:.0f}%), "
                  f"validate {st['va']['n']} trades avgR {st['va']['m']:+.4f}; flat version {st['exf']['m']:+.4f} / {st['vaf']['m']:+.4f}.")
-        m_st, r_st, _, _, _ = select(D, st["cfg"], grid, age_cap)
-        hour_table(L, D, r_st, m_st & ex_m, m_st & va_m, "stated config (holdout not read)", "validate")
+        m_st, r_st, rf_st, _, _ = select(D, st["cfg"], grid, age_cap)
+        hour_table(L, D, r_st, m_st & ex_m, m_st & va_m, "log derived config", "validate")
+        hm = m_st & ho_m
+        if st["ex"]["m"] > 0 and st["va"]["m"] > 0 and hm.any():
+            a_, b_ = stats(r_st[hm], mcode[hm]), stats(rf_st[hm], mcode[hm]); nq = hm & (D[:, I["sym"]] == syms.index("NQ")) if "NQ" in syms else hm & False
+            L.append(f"\n**Log derived config, gate open (explore and validate both positive): holdout 2017 to 2026, {a_['n']} trades, net avgR {a_['m']:+.4f}, "
+                     f"t {a_['t']:.2f}, win {a_['win']:.0f}% -> {'PASS' if (a_['m'] > 0 and a_['t'] > 2.0) else 'no'}; flat {b_['m']:+.4f} (t {b_['t']:.2f})"
+                     + (f"; NQ alone {nq.sum()} trades avgR {r_st[nq].mean():+.4f}" if nq.any() else "") + "**")
+        else:
+            L.append("\nLog derived config: holdout sealed (exploration or validation not positive).")
     chosen = None
     if top:
         chosen = max(top, key=lambda c: (c["va"]["m"] if c["va"]["n"] >= 50 else -9))
+        if not (chosen["ex"]["m"] > 0 and chosen["va"]["m"] > 0):
+            L.append(f"\nChosen {cfg_label(chosen['cfg'])}: holdout sealed (exploration {chosen['ex']['m']:+.4f}, validation {chosen['va']['m']:+.4f}, not both positive)."); chosen = None
+    if chosen:
         m, r, rf, why, ov = select(D, chosen["cfg"], grid, age_cap)
         hour_table(L, D, r, m & ex_m, m & ho_m, "chosen config"); m &= ho_m
         r, rf, why, ov = r[m], rf[m], why[m], ov[m]; H = D[m]

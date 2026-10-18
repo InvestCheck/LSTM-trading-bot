@@ -79,13 +79,13 @@ def find(j, d, lo_a, hi_a, tol, anycol, width, T, O, H, L, C, A, rng, fmaxC, fmi
             if not (L[j] <= zh + tol * a and zh < C[j]): continue
             if C[k + 1:j].min() < zl or fmaxC[k] <= zh: continue
             spike = (fmaxC[k] - C[k]) / (zh - zl); cont = int(C[k + 1] >= O[k + 1]); taps = taps_after_leaving(L[k + 1:j] > zh, L[k + 1:j] <= zh)
-            closes_in = int(((C[k + 1:j] <= zh) & (C[k + 1:j] >= zl)).sum())
+            closes_in = taps_after_leaving(L[k + 1:j] > zh, (C[k + 1:j] <= zh) & (C[k + 1:j] >= zl))
         else:
             if not anycol and not C[k] > O[k]: continue
             if not (H[j] >= zl - tol * a and zl > C[j]): continue
             if C[k + 1:j].max() > zh or fminC[k] >= zl: continue
             spike = (C[k] - fminC[k]) / (zh - zl); cont = int(C[k + 1] <= O[k + 1]); taps = taps_after_leaving(H[k + 1:j] < zl, H[k + 1:j] >= zl)
-            closes_in = int(((C[k + 1:j] <= zh) & (C[k + 1:j] >= zl)).sum())
+            closes_in = taps_after_leaving(H[k + 1:j] < zl, (C[k + 1:j] <= zh) & (C[k + 1:j] >= zl))
         age = j - k
         out.append(dict(k=k, zh=zh, zl=zl, in_bucket=int(lo_a <= age <= hi_a), spike=spike, cont=cont, taps=taps, closes_in=closes_in, age=age,
                         cons_atr=span6[k0] / A[k0] if A[k0] > 0 else np.nan, appr_max=rmax6[j] / a, appr_net=abs(C[j - 1] - C[max(0, j - 13)]) / a))
