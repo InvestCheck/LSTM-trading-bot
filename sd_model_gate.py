@@ -51,10 +51,11 @@ def main():
     for sym in syms:
         t0 = time.time(); raw = load_1m(cat[sym]); end = int(datetime(VAL_END, 1, 1, tzinfo=timezone.utc).timestamp()); keep = raw[0] < end; raw = tuple(x[keep] for x in raw)
         B = build_B(raw); T, O, H, L_, C, A = B[:6]; mod = B[13]; sess = (T - 60 + 6 * 3600) // 86400; V = R.resample(*raw, 5)[5]
-        sig = R.scan_signals((T, O, H, L_, C, V), cfg["spike"], cfg["cons"], cfg["approach"], R.TICKS.get(sym, 0.25))
+        tick = R.TICKS.get(sym, 0.25); mult = R.MICROS[sym][1]
+        sig = R.scan_signals((T, O, H, L_, C, V), cfg["spike"], cfg["cons"], cfg["approach"], tick)
         rows = []
         for s in sig:
-            f = features(s["j"], s["dir"], s["lo"], s["hi"], s, B); out = replay(s["j"], s["dir"], s["hi"], s["lo"], T, O, H, L_, C, A, mod, sess, None)
+            f = features(s["j"], s["dir"], s["lo"], s["hi"], s, B); out = replay(s["j"], s["dir"], s["hi"], s["lo"], T, O, H, L_, C, A, mod, sess, None, tick, mult)
             if out is None: continue
             x = np.array([f[k] for k in FEATS]); z = (x - mu) / sd; score = 1 / (1 + np.exp(-(w[0] + z @ w[1:])))
             dt = datetime.fromtimestamp(int(T[s["j"]]), timezone.utc)

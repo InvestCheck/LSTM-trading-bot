@@ -27,7 +27,7 @@ OUT = "research"; COMM = 1.5; MULT = 2.0; TICK = 0.25; FLAT_MIN = 16 * 60 + 45; 
 VARIANTS = ["fixed_2R", "fixed_3R", "be_2R", "be_3R", "flat", "his_exit"]
 
 
-def replay(j, d, zh, zl, T, O, H, L, C, A, mod, sess, exit_ts):
+def replay(j, d, zh, zl, T, O, H, L, C, A, mod, sess, exit_ts, TICK=TICK, MULT=MULT):
     n = len(T); i0 = j + 1
     if i0 >= n: return None
     entry = O[i0] + d * TICK; a = A[j]
