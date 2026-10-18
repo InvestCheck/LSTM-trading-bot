@@ -57,15 +57,18 @@ MICROS = {
     "J1": ("MJY", 1250000, 1.5), "E1": ("MSF", 12500, 1.5), "XC": ("XC", 10, 2.0),
 }
 PLANS = {
-    "topstep150": dict(start=150000, target=9000, dd=4500, dd_mode="eod", consistency_eval=0.50, consistency_payout=0.50,
+    "topstep150": dict(start=150000, target=9000, dd=4500, dd_mode="eod", consistency_eval=0.55, consistency_payout=0.55,
                        payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90,
                        eval_fee_month=375, activation=149, max_contracts=150),
     "tradeify150": dict(start=150000, target=9000, dd=4500, dd_mode="eod", consistency_eval=0.40, consistency_payout=0.40,
                         payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90,
                         eval_fee_month=0, eval_fee_once=340, activation=0, max_contracts=150),
-    "topstep50": dict(start=50000, target=3000, dd=2000, dd_mode="eod", consistency_eval=0.50, consistency_payout=0.50,
+    "topstep50": dict(start=50000, target=3000, dd=2000, dd_mode="eod", consistency_eval=0.55, consistency_payout=0.55,
                       payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90,
                       eval_fee_month=165, activation=149, max_contracts=50),
+    "tradeify50": dict(start=50000, target=3000, dd=2000, dd_mode="eod", consistency_eval=0.40, consistency_payout=0.40,
+                       payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90,
+                       eval_fee_month=0, eval_fee_once=99.95, activation=0, max_contracts=50),
 }
 EVAL_RISK = [0.05, 0.10, 0.20, 0.33, 0.50]            # fraction of the drawdown risked per trade in the eval
 FUNDED = [(0.33, 0.10), (0.20, 0.10), (0.20, 0.20), (0.10, 0.10)]   # (risk until profit >= one drawdown, risk after)
