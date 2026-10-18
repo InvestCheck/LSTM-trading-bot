@@ -56,20 +56,26 @@ MICROS = {
     "NG": ("QG", 2500, 1.5), "E6": ("M6E", 12500, 1.5), "A6": ("M6A", 10000, 1.5), "B6": ("M6B", 6250, 1.5),
     "J1": ("MJY", 1250000, 1.5), "E1": ("MSF", 12500, 1.5), "XC": ("XC", 10, 2.0),
 }
-PLANS = {
-    "topstep150": dict(start=150000, target=9000, dd=4500, dd_mode="eod", consistency_eval=0.55, consistency_payout=0.55,
-                       payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90,
-                       eval_fee_month=375, activation=149, max_contracts=150),
-    "tradeify150": dict(start=150000, target=9000, dd=4500, dd_mode="eod", consistency_eval=0.40, consistency_payout=0.40,
-                        payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90,
-                        eval_fee_month=0, eval_fee_once=340, activation=0, max_contracts=150),
-    "topstep50": dict(start=50000, target=3000, dd=2000, dd_mode="eod", consistency_eval=0.55, consistency_payout=0.55,
-                      payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90,
-                      eval_fee_month=165, activation=149, max_contracts=50),
-    "tradeify50": dict(start=50000, target=3000, dd=2000, dd_mode="eod", consistency_eval=0.40, consistency_payout=0.40,
-                       payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90,
-                       eval_fee_month=0, eval_fee_once=99.95, activation=0, max_contracts=50),
-}
+def topstep(size, target, dd, fee_month, activation, dll, name):
+    return dict(start=size, target=target, dd=dd, dd_mode="eod", consistency_eval=0.55, consistency_payout=0.55,
+                payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90, eval_fee_month=fee_month,
+                activation=activation, max_contracts=size // 1000, daily_loss=dll, label=name)
+
+PLANS = {}
+for size, target, dd, std, nafee, rta in ((50000, 3000, 2000, 49, 95, 85), (100000, 6000, 3000, 99, 149, 129),
+                                         (150000, 9000, 4500, 199, 229, 199)):
+    k = size // 1000; dll = dd // 2 if size == 50000 else (2000 if size == 100000 else 3000)
+    PLANS[f"topstep{k}_std"] = topstep(size, target, dd, std, 149, dll, f"Topstep {k}K standard: ${std}/mo, $149 activation, daily loss ${dll}")
+    PLANS[f"topstep{k}_noact"] = topstep(size, target, dd, nafee, 0, None, f"Topstep {k}K no activation: ${nafee}/mo, no daily loss limit")
+    PLANS[f"topstep{k}_rta"] = topstep(size, target, dd, rta, 0, dll, f"Topstep {k}K no activation + RTA: ${rta}/mo, daily loss ${dll}")
+PLANS["tradeify150"] = dict(start=150000, target=9000, dd=4500, dd_mode="eod", consistency_eval=0.40, consistency_payout=0.40,
+                            payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90,
+                            eval_fee_month=0, eval_fee_once=340, activation=0, max_contracts=150, daily_loss=None,
+                            label="Tradeify 150K: $340 once")
+PLANS["tradeify50"] = dict(start=50000, target=3000, dd=2000, dd_mode="eod", consistency_eval=0.40, consistency_payout=0.40,
+                           payout_win_days=5, payout_win_min=200, payout_frac=0.50, split=0.90,
+                           eval_fee_month=0, eval_fee_once=99.95, activation=0, max_contracts=50, daily_loss=None,
+                           label="Tradeify 50K: $99.95 once")
 EVAL_RISK = [0.05, 0.10, 0.20, 0.33, 0.50]            # fraction of the drawdown risked per trade in the eval
 FUNDED = [(0.33, 0.10), (0.20, 0.10), (0.20, 0.20), (0.10, 0.10)]   # (risk until profit >= one drawdown, risk after)
 # note: one micro contract needs risk >= half its dollar R (about $100 to $400), so fractions below ~5% of a
@@ -177,8 +183,9 @@ def simulate_plan(plan, trades, days, eval_risk, f_risk, f_risk_after, seed=0):
                 if n >= 1: open_trades.append((tr, n))
             # today's P&L and intraday path
             day_pnl = 0.0; worst_intraday = 0.0; run = 0.0
-            for tr, n in open_trades:
+            for tr, n in open_trades:                                   # in order; a daily loss limit locks the day out
                 if cur in tr["pnl_day"]: day_pnl += n * tr["pnl_day"][cur]
+                if P.get("daily_loss") and day_pnl <= -P["daily_loss"]: break      # later trades that day are not taken
             if P["dd_mode"] == "intraday":
                 # approximate: sum of per trade intraday lows (conservative)
                 worst_intraday = sum(n * min((lo for _, lo in tr["path_day"].get(cur, [(0, 0)])), default=0) for tr, n in open_trades)
@@ -253,10 +260,11 @@ def main():
          f"(weekly, {starts[0]} to {starts[-1]}). Flat at the close and over weekends, re entry at 18:00 ET, "
          f"commissions and a tick each way. Risk fractions are of the plan's drawdown. Funded sizing drops to the "
          f"second fraction once profit exceeds one drawdown.\n"]
+    console = ["", f"{'plan':16s} {'best eval risk':>14s} {'funded':>12s} {'pass':>5s} {'days':>5s} {'EV/attempt':>11s} {'EV/yr':>8s}"]
     for name in plans:
-        P = PLANS[name]
-        L += [f"\n## {name}: start {P['start']}, target {P['target']}, drawdown {P['dd']} ({P['dd_mode']}), consistency "
-              f"{P['consistency_eval']:.0%} eval / {P['consistency_payout']:.0%} payout\n",
+        P = PLANS[name]; best_rows = []
+        L += [f"\n## {name}: {P.get('label', '')} | target {P['target']}, drawdown {P['dd']}, consistency "
+              f"{P['consistency_eval']:.0%}\n",
               "| eval risk | funded risk (initial / after buffer) | pass rate | median days to pass | fees per pass | "
               "P(any payout) | payouts per funded acct | funded life (days) | EV per attempt | EV per year |",
               "|---|---|---|---|---|---|---|---|---|---|"]
@@ -270,11 +278,15 @@ def main():
                 med_days = np.median([r["days_to_pass"] for r in passed]) if passed else float("nan")
                 dur = np.mean([(r["days_to_pass"] or MAX_EVAL_DAYS) + r["funded_days"] for r in recs])
                 fpp = f"${fees / pr:,.0f}" if pr > 0 else "n/a"
+                best_rows.append((ev, er, fr, fa, pr, med_days, ev * 365 / max(dur, 1)))
                 L.append(f"| {er:.0%} | {fr:.0%} / {fa:.1%} | {pr:.0%} | {med_days:.0f} | {fpp} | "
                          f"{np.mean([r['payouts'] > 0 for r in passed]) if passed else 0:.0%} | "
                          f"${np.mean([r['payouts'] for r in passed]) if passed else 0:,.0f} | "
                          f"{np.mean([r['funded_days'] for r in passed]) if passed else 0:.0f} | ${ev:,.0f} | ${ev * 365 / max(dur, 1):,.0f} |")
-                print(L[-1])
+                pass
+        ev, er, fr, fa, pr, md, evy = max(best_rows)
+        console.append(f"{name:16s} {er:>14.0%} {f'{fr:.0%} / {fa:.0%}':>12s} {pr:>5.0%} {md:>5.0f} {ev:>11,.0f} {evy:>8,.0f}")
+    print("\n".join(console))
     L.append("\nEV per attempt = expected payouts (after split) minus expected fees, per eval started. EV per year assumes "
              "attempts run back to back. The strategy's edge here is close to zero after fills, so most of any positive "
              "EV is the firm absorbing the drawdown; check the consistency and payout rules against the firm's current terms.")
