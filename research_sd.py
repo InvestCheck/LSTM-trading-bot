@@ -221,6 +221,52 @@ def simulate(sym_id, bars, tf, cfg_id, spike_mult, cons_atr, appr_atr, tick, mul
     return np.array(out, dtype=float).reshape(-1, len(COLS))
 
 
+def scan_signals(bars, spike_mult, cons_atr, appr_atr, tick, start_idx=60):
+    """Every rejection event the engine's zone logic produces, with no position gating:
+    list of dicts (j = rejection bar, dir, lo, hi, born, taps, cin, age, spike, cons_atr). Used
+    by sd_discriminate.py to compare the engine's fires with Adam's picks."""
+    T, O, H, L, C, V = bars; n = len(T)
+    A = atr(H, L, C); mod = ((T // 60) % 1440).astype(int); rng6 = H - L
+    span6 = np.full(n, np.inf); span6[5:] = swv(H, 6).max(axis=1) - swv(L, 6).min(axis=1)
+    rmax6 = np.zeros(n); rmax6[5:] = swv(rng6, 6).max(axis=1)
+    m = n - 6; W = swv(C[1:], 6)[:m]
+    up = (W - C[:m, None]) >= spike_mult * rng6[:m, None]; dn = (C[:m, None] - W) >= spike_mult * rng6[:m, None]
+    kup = np.where(up.any(1), up.argmax(1), -1); kdn = np.where(dn.any(1), dn.argmax(1), -1)
+    ok = (rng6[:m] >= 3 * tick) & (span6[:m] <= cons_atr * A[:m]) & (np.arange(m) >= start_idx)
+    bear = ok & (C[:m] < O[:m]) & (C[1:m + 1] >= O[1:m + 1]) & (kup >= 0)
+    bull = ok & (C[:m] > O[:m]) & (C[1:m + 1] <= O[1:m + 1]) & (kdn >= 0)
+    births = defaultdict(list)
+    for i in np.flatnonzero(bear): births[i + 1 + kup[i]].append((1, L[i], H[i], i))
+    for i in np.flatnonzero(bull): births[i + 1 + kdn[i]].append((-1, L[i], H[i], i))
+    demand, supply, out = [], [], []
+    for j in range(start_idx, n):
+        a = A[j - 1] if A[j - 1] > 0 else 1e-12
+        demand = [z for z in demand if C[j] >= z["lo"] and z["hi"] >= C[j] - 30 * a]
+        supply = [z for z in supply if C[j] <= z["hi"] and z["lo"] <= C[j] + 30 * a]
+        for side, lo, hi, i in births.get(j, ()):
+            (demand if side > 0 else supply).append(dict(lo=lo, hi=hi, i=i, taps=0, cin=0, born=j, left=False))
+        if mod[j] < FLAT_MIN - 5 and rmax6[j] <= appr_atr * a:
+            for z in sorted(demand, key=lambda z: -z["hi"]):
+                if z["left"] and L[j] <= z["hi"] and C[j] > z["hi"]:
+                    out.append(dict(j=j, dir=1, lo=z["lo"], hi=z["hi"], born=z["born"], taps=z["taps"], cin=z["cin"], age=j - z["born"],
+                                    spike=(C[z["i"] + 1:z["i"] + 7].max() - C[z["i"]]) / max(1e-9, z["hi"] - z["lo"]), cons_atr=span6[z["i"]] / A[z["i"]])); break
+            for z in sorted(supply, key=lambda z: z["lo"]):
+                if z["left"] and H[j] >= z["lo"] and C[j] < z["lo"]:
+                    out.append(dict(j=j, dir=-1, lo=z["lo"], hi=z["hi"], born=z["born"], taps=z["taps"], cin=z["cin"], age=j - z["born"],
+                                    spike=(C[z["i"]] - C[z["i"] + 1:z["i"] + 7].min()) / max(1e-9, z["hi"] - z["lo"]), cons_atr=span6[z["i"]] / A[z["i"]])); break
+        for z in demand:
+            if not z["left"]: z["left"] = L[j] > z["hi"]
+            elif L[j] <= z["hi"]:
+                z["taps"] += 1
+                if C[j] <= z["hi"]: z["cin"] += 1
+        for z in supply:
+            if not z["left"]: z["left"] = H[j] < z["lo"]
+            elif H[j] >= z["lo"]:
+                z["taps"] += 1
+                if C[j] >= z["lo"]: z["cin"] += 1
+    return out
+
+
 # ---------------------------------------------------------------- scoring (vectorised)
 def outcome(D, manage, target, flat):
     """Per trade result for one management/target variant: (valid mask, R, why code, overnight)."""
