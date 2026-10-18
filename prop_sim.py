@@ -21,7 +21,9 @@ eligibility by winning days, payout as a fraction of profit with a split, and
 after a payout the floor moves to the starting balance (balance cannot go below
 zero profit). Fees: eval per month, activation. Edit PLANS to match the firm.
 
-Usage (repo folder):  python3 prop_sim.py DATA_DIR [--stop-rule] [--plan NAME]
+Usage (repo folder):  python3 prop_sim.py DATA_DIR [--stop-rule] [--plan NAME] [--hold] [--no-consistency]
+  --hold            hold through the close and weekends (a swing plan), no forced flat or re entries
+  --no-consistency  ignore the consistency rule for passing and payouts (ceiling test)
 Writes research/prop_report.md.
 """
 import os, sys, math, json, csv
@@ -64,6 +66,7 @@ FUNDED = [(0.33, 0.10), (0.20, 0.10), (0.20, 0.20), (0.10, 0.10)]   # (risk unti
 # note: one micro contract needs risk >= half its dollar R (about $100 to $400), so fractions below ~5% of a
 # 4,500 drawdown stop the account trading altogether
 MAX_EVAL_DAYS = 365
+FLAT_AT_CLOSE = True
 
 
 def session_day(ts):
@@ -128,9 +131,9 @@ def build_trades(cat, syms, stop_rule):
                     last_px = px_end
                     if u == ei:
                         pnl_day[day] -= 2 * comm + tick * mult; break
-                    if hr == 16:                          # forced flat before the close
+                    if FLAT_AT_CLOSE and hr == 16:        # forced flat before the close
                         pnl_day[day] -= 2 * comm + tick * mult; held = False
-                    elif hr == 17:
+                    elif FLAT_AT_CLOSE and hr == 17:
                         held = False
                 if t0 == ei: pnl_day[session_day(TT[t0])] -= 2 * comm + tick * mult
                 out.append(dict(symbol=sym, micro=micro, entry_day=session_day(TT[t0]), R_unit=R_px * mult,
@@ -209,6 +212,10 @@ def main():
     args = sys.argv[1:]
     if not args: sys.exit("usage: python3 prop_sim.py DATA_DIR [--stop-rule] [--plan NAME]")
     stop_rule = "--stop-rule" in args
+    global FLAT_AT_CLOSE
+    if "--hold" in args: FLAT_AT_CLOSE = False
+    if "--no-consistency" in args:
+        for P in PLANS.values(): P["consistency_eval"] = P["consistency_payout"] = 1.0
     plans = [args[args.index("--plan") + 1]] if "--plan" in args else list(PLANS)
     cat = build_catalog(args[0])
     trades = build_trades(cat, list(MICROS), stop_rule)
@@ -220,7 +227,9 @@ def main():
         d += timedelta(days=1)
     starts = all_days[::5]                                     # one eval start a week
     os.makedirs(OUT, exist_ok=True)
-    L = [f"# Prop firm simulation: v2{' + stop rule' if stop_rule else ''} on CME micros\n",
+    L = [f"# Prop firm simulation: v2{' + stop rule' if stop_rule else ''} on CME micros"
+         f"{' (holding through closes and weekends)' if not FLAT_AT_CLOSE else ''}"
+         f"{' (no consistency rule)' if '--no-consistency' in args else ''}\n",
          f"{len(trades)} trades on {len(set(t['symbol'] for t in trades))} instruments, {len(starts)} eval start dates "
          f"(weekly, {starts[0]} to {starts[-1]}). Flat at the close and over weekends, re entry at 18:00 ET, "
          f"commissions and a tick each way. Risk fractions are of the plan's drawdown. Funded sizing drops to the "
@@ -241,7 +250,8 @@ def main():
                 ev = pay - fees
                 med_days = np.median([r["days_to_pass"] for r in passed]) if passed else float("nan")
                 dur = np.mean([(r["days_to_pass"] or MAX_EVAL_DAYS) + r["funded_days"] for r in recs])
-                L.append(f"| {er:.0%} | {fr:.0%} / {fa:.1%} | {pr:.0%} | {med_days:.0f} | ${fees / max(pr, 1e-9):,.0f} | "
+                fpp = f"${fees / pr:,.0f}" if pr > 0 else "n/a"
+                L.append(f"| {er:.0%} | {fr:.0%} / {fa:.1%} | {pr:.0%} | {med_days:.0f} | {fpp} | "
                          f"{np.mean([r['payouts'] > 0 for r in passed]) if passed else 0:.0%} | "
                          f"${np.mean([r['payouts'] for r in passed]) if passed else 0:,.0f} | "
                          f"{np.mean([r['funded_days'] for r in passed]) if passed else 0:.0f} | ${ev:,.0f} | ${ev * 365 / max(dur, 1):,.0f} |")
