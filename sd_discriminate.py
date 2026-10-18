@@ -25,7 +25,7 @@ outside the log window; a rule that comes out of it still has to pass the 2008 t
 gate in research_sd.py before a holdout is read.
 
 Usage (repo folder):  python3 sd_discriminate.py DATA_DIR_1m [--symbol NQ]
-Writes research/sd_discriminate.csv (one row per event with features, label, outcome).
+Writes research/sd_discriminate.csv (one row per event with features, label, outcome) and research/sd_model.json (the fitted model, used by sd_model_gate.py).
 """
 import os, sys, csv, glob, re
 from datetime import datetime, timezone
@@ -69,6 +69,18 @@ def features(j, d, lo, hi, meta, B):
                 r12_1h=r1h_s[j] * d / a, sess_asia=int(hr >= 18 or hr < 3), sess_london=int(3 <= hr < 7), sess_nyam=int(7 <= hr < 12), sess_nypm=int(12 <= hr < 17), long=int(d > 0))
 
 
+def build_B(raw):
+    """Bar series and the aligned higher timeframe features used by features(), from 1 minute arrays."""
+    T, O, H, L, C, V = resample(*raw, 5); A = atr(H, L, C); e21 = ema(C, 21); mod = ((T // 60) % 1440).astype(int)
+    T15, O15, H15, L15, C15, V15 = resample(*raw, 15); e21_15 = ema(C15, 21); s21_15 = np.r_[np.zeros(5), e21_15[5:] - e21_15[:-5]]
+    hh = np.zeros(len(T15))
+    for i in range(30, len(T15)): hh[i] = swings(H15[i - 30:i + 1], L15[i - 30:i + 1])
+    T4, O4, H4, L4, C4, V4 = resample(*raw, 240); e50_4h = ema(C4, 50)
+    T1, O1, H1, L1, C1, V1 = resample(*raw, 60); r1h = np.r_[np.zeros(12), C1[12:] - C1[:-12]]
+    return (T, O, H, L, C, A, e21, align(T4, C4 - e50_4h, T, 1), align(T15, C15 - e21_15, T, 1), align(T15, s21_15, T, 1), align(T15, hh, T, 1),
+            session_vwap(T, H, L, C, V), align(T1, r1h, T, 1), mod)
+
+
 def align(Tb, X, T_trade, lag=0):
     idx = np.searchsorted(Tb, T_trade, side="right") - 1 - lag
     return np.where(idx >= 0, X[np.clip(idx, 0, len(X) - 1)], np.nan)
@@ -96,14 +108,7 @@ def main():
     cat = {re.sub(r"_full_1min.*$", "", os.path.basename(p)): p for p in glob.glob(os.path.join(args[0], "*_full_1min*"))}
     raw = load_1m(cat[sym])
     t0 = int(datetime(2026, 4, 1, tzinfo=timezone.utc).timestamp()); keep = raw[0] >= t0; raw = tuple(x[keep] for x in raw)
-    T, O, H, L, C, V = resample(*raw, 5); n = len(T); A = atr(H, L, C); e21 = ema(C, 21); mod = ((T // 60) % 1440).astype(int); sess = (T - 60 + 6 * 3600) // 86400
-    T15, O15, H15, L15, C15, V15 = resample(*raw, 15); e21_15 = ema(C15, 21); s21_15 = np.r_[np.zeros(5), e21_15[5:] - e21_15[:-5]]
-    hh = np.zeros(len(T15))
-    for i in range(30, len(T15)): hh[i] = swings(H15[i - 30:i + 1], L15[i - 30:i + 1])
-    T4, O4, H4, L4, C4, V4 = resample(*raw, 240); e50_4h = ema(C4, 50)
-    T1, O1, H1, L1, C1, V1 = resample(*raw, 60); r1h = np.r_[np.zeros(12), C1[12:] - C1[:-12]]
-    B = (T, O, H, L, C, A, e21, align(T4, C4 - e50_4h, T, 1), align(T15, C15 - e21_15, T, 1), align(T15, s21_15, T, 1), align(T15, hh, T, 1),
-         session_vwap(T, H, L, C, V), align(T1, r1h, T, 1), mod)
+    B = build_B(raw); T, O, H, L, C, A = B[0], B[1], B[2], B[3], B[4], B[5]; V = resample(*raw, 5)[5]; n = len(T); mod = B[13]; sess = (T - 60 + 6 * 3600) // 86400
     cfg = R.STATED; tick = R.TICKS.get(sym, 0.25)
     w0 = int(datetime.strptime(R.LOG_WINDOW[0], "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()); w1 = int(datetime.strptime(R.LOG_WINDOW[1], "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
     sig = [s for s in R.scan_signals((T, O, H, L, C, V), cfg["spike"], cfg["cons"], cfg["approach"], tick) if w0 <= T[s["j"]] < w1]
@@ -145,6 +150,7 @@ def main():
         if te.sum() == 0 or len(set(y[tr])) < 2: continue
         w = logistic_fit(Z[tr], y[tr], l2=3.0); p_oof[te] = 1 / (1 + np.exp(-(np.column_stack([np.ones(te.sum()), Z[te]]) @ w)))
     w = logistic_fit(Z, y, l2=3.0)
+    import json; json.dump(dict(feats=FEATS, mu=mu.tolist(), sd=sd.tolist(), w=w.tolist(), window=list(R.LOG_WINDOW)), open(os.path.join(OUT, "sd_model.json"), "w"))
     print(f"\nlogistic model, 5 fold out of fold: AUC {auc(p_oof, y):.2f}, accuracy {((p_oof > 0.5) == (y == 1)).mean() * 100:.0f}% (base rate {y.mean() * 100:.0f}% positives)")
     print("coefficients (standardised): " + ", ".join(f"{FEATS[k]} {w[k + 1]:+.2f}" for k in np.argsort(-np.abs(w[1:]))[:10]))
     take = p_oof >= np.median(p_oof)
