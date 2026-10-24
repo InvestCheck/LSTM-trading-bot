@@ -41,6 +41,7 @@ from research_model import TICK_FIX
 from ib_contracts import UNIVERSE
 
 OUT = "research"
+MINTOUCH_RUN = 3
 WARMUP_DAYS = 60
 SPLIT_YEAR = 2017
 BOOT_REPS, SEED = 400, 41
@@ -104,7 +105,7 @@ def simulate(sym, path, start_ts, gate, tick):
              hi1=rolling_extreme(H, 5800, True), lo1=rolling_extreme(L, 5800, False))
     PH, PL = pivots(H, L, K)
     # engine's own trades (one position rule) for flat/confirm, via the research harvest replay
-    _, sigs = harvest(path, start_ts=start_ts)
+    _, sigs = harvest(path, start_ts=start_ts, MINTOUCH=MINTOUCH_RUN)
     by_bar = defaultdict(list)
     for sg in sigs: by_bar[sg["t0"]].append(sg)
     engine, busy, taken, taken_at = {}, -1, set(), {}
@@ -228,6 +229,9 @@ def main():
         for a in args[args.index("--symbols") + 1:]:
             if a.startswith("--"): break
             syms.append(a)
+    global MINTOUCH_RUN
+    MINTOUCH_RUN = int(args[args.index("--mintouch") + 1]) if "--mintouch" in args else 3
+    import entry_scan; entry_scan.MINTOUCH = MINTOUCH_RUN
     cat = build_catalog(args[0]); gate = Gate()
     allres = {m: [] for m in MODES}; engine_ts = []
     for sym in syms:
@@ -299,8 +303,10 @@ def main():
           f"For reference, refit minus deep on the holdout: {d_r:+.4f} (t {t_r:.2f}).",
           "\nfill vs engine: positive means the fill was worse than the engine's assumed entry, in R; the worst column is "
           "the tail the deeper line placement carries (E1 on 2026-10-14 was +1.37R)."]
-    open(os.path.join(OUT, "placement_report.md"), "w").write("\n".join(L) + "\n")
-    print("\n".join(L)); print(f"\n-> {OUT}/placement_report.md")
+    name = "placement_report.md" if MINTOUCH_RUN == 3 else f"placement_report_t{MINTOUCH_RUN}.md"
+    L.insert(1, f"\nMinimum touches for this run: {MINTOUCH_RUN}.\n")
+    open(os.path.join(OUT, name), "w").write("\n".join(L) + "\n")
+    print("\n".join(L)); print(f"\n-> {OUT}/{name}")
 
 
 if __name__ == "__main__":
