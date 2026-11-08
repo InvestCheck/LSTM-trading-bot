@@ -414,11 +414,37 @@ class Broker:
         return c
 
     # ---- orders -----------------------------------------------------------
-    def position_qty(self, conid):
-        for p in self.ib.positions():
+    def position_qty(self, conid, fresh=False):
+        """Held quantity in conid. fresh=True asks IBKR again instead of trusting the cached
+        position list (a reconnect or a timed out request can leave it empty). Returns None
+        when the fresh request fails: unknown is not zero, and callers must not act on it."""
+        try:
+            plist = self.ib.reqPositions() if fresh else self.ib.positions()
+        except Exception as e:
+            log_event(f"[ib] position request failed: {e}")
+            return None
+        for p in plist or []:
             if p.contract.conId == conid:
                 return int(p.position)
         return 0
+
+    def all_positions(self):
+        """Fresh {conId: (qty, localSymbol)} from IBKR, or None when the request fails."""
+        try:
+            return {p.contract.conId: (int(p.position), p.contract.localSymbol) for p in (self.ib.reqPositions() or []) if p.position}
+        except Exception as e:
+            log_event(f"[ib] position request failed: {e}")
+            return None
+
+    def cancel_all_for(self, conid):
+        """Cancel every open order of ours on a contract (used when flattening an orphan)."""
+        n = 0
+        for t in list(self.ib.openTrades()):
+            if t.contract.conId == conid:
+                try: self.ib.cancelOrder(t.order); n += 1
+                except Exception as e: log_event(f"[ib] cancel failed on {conid}: {e}")
+        if n: self.ib.sleep(2)
+        return n
 
     def open_trade(self, order_id):
         for t in self.ib.openTrades():
@@ -492,9 +518,13 @@ class Broker:
             self.ib.sleep(1)
 
     def close(self, contract):
-        """Flatten whatever the broker actually holds in this contract."""
+        """Flatten whatever the broker actually holds in this contract, checked with a
+        fresh position request. (None, None) when flat; (None, "unknown") when the
+        request failed and nothing was sent."""
         from ib_async import MarketOrder
-        q = self.position_qty(contract.conId)
+        q = self.position_qty(contract.conId, fresh=True)
+        if q is None:
+            return None, "unknown"
         if q == 0:
             return None, None
         o = MarketOrder("SELL" if q > 0 else "BUY", abs(q)); o.tif = "GTC"; o.outsideRth = True
@@ -757,9 +787,10 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc, st_scan=None):
                 P["stop"], P["phase"] = op["stop"], op["phase"]
                 log_trade("stop_move", s, contract=local, dir=P["dir"], bar_time=iso(last_ts),
                           stop=op["stop"], note=(f"phase {op['phase']} " + note).strip())
-            # broker already flat (its stop fired) while the engine still holds
+            # broker already flat (its stop fired) while the engine still holds: fresh position
+            # request, and the stop order must be gone too (a failed request returns None, not 0)
             if paper and P.get("broker_closed") is None and P.get("fill") is not None \
-                    and broker.position_qty(P["con_id"]) == 0 and broker.open_trade(P["stop_order_id"]) is None:
+                    and broker.position_qty(P["con_id"], fresh=True) == 0 and broker.open_trade(P["stop_order_id"]) is None:
                 fx = broker.fill_of(P["stop_order_id"])
                 P["broker_closed"] = fx if fx is not None else -1
                 log_trade("broker_stop_filled", s, contract=local, dir=P["dir"], actual_px=fx,
@@ -772,21 +803,33 @@ def reconcile(s, T, trades, op, state, broker, details, now_utc, st_scan=None):
                 bc = P.get("broker_closed")
                 actual = bc if bc not in (None, -1) else tr["exit"]
                 note = (note + " shadow: exit at engine price").strip() if bc in (None, -1) else (note + " shadow: provisional stop").strip()
+            pending = False
             if paper:
                 if P.get("broker_closed") is not None:
                     actual = P["broker_closed"] if P["broker_closed"] != -1 else None
                     note = (note + " filled earlier by broker stop").strip()
                 else:
-                    broker.cancel(P["stop_order_id"])
+                    # close first on a fresh position check; the stop is cancelled only once we know
+                    # the broker's answer. An unknown answer keeps the position and retries next pass.
                     actual, oid = broker.close(broker.order_contract(P["con_id"], P.get("exchange") or c.exchange))
-                    if actual is None and oid is None:
-                        actual = broker.fill_of(P["stop_order_id"])
-                        note = (note + " already flat, stop fill used").strip()
-            log_trade("exit", s, contract=P["local"], dir=P["dir"], qty=P["qty"], bar_time=iso(exit_ts),
-                      engine_px=tr["exit"], actual_px=actual, R_px=P["R"], R_engine=tr["R"],
-                      R_actual=r_actual(P, actual), why=tr["why"], note=note, order_id=oid)
-            del positions[s]
-            P = None
+                    if oid == "unknown":
+                        pending = True; oid = None
+                        if not P.get("exit_pending_logged"):
+                            P["exit_pending_logged"] = True
+                            log_trade("error", s, contract=P["local"], dir=P["dir"], bar_time=iso(exit_ts),
+                                      note="engine exit but the position request failed; stop left in place, retrying next pass")
+                    else:
+                        broker.cancel(P["stop_order_id"])
+                        if actual is None and oid is None:
+                            actual = broker.fill_of(P["stop_order_id"])
+                            note = (note + (" already flat, stop fill used" if actual is not None
+                                            else " already flat, no stop fill found: manual check")).strip()
+            if not pending:
+                log_trade("exit", s, contract=P["local"], dir=P["dir"], qty=P["qty"], bar_time=iso(exit_ts),
+                          engine_px=tr["exit"], actual_px=actual, R_px=P["R"], R_engine=tr["R"],
+                          R_actual=r_actual(P, actual), why=tr["why"], note=note, order_id=oid)
+                del positions[s]
+                P = None
         else:
             if not P.get("orphan_logged"):
                 P["orphan_logged"] = True
@@ -878,11 +921,60 @@ def settle_resting(s, state, broker, st, T, op, details, tick):
     for o in orders:
         d = o["dir"]
         if last < 1 or int(o.get("placed_after", -1)) != int(T[last - 1]):
-            # more than one bar has closed since this order was placed (a missed pass): the
-            # order was for a bar we did not see close, so it is cancelled and not interpreted
-            if paper: broker.cancel(o["entry_order_id"])
-            log_trade("rest_stale", s, contract=local, dir=d, bar_time=iso(o.get("placed_after", last_ts)),
-                      engine_px=o["trigger"], note="order outlived its bar; cancelled, not interpreted")
+            # more than one bar has closed since this order was placed (a missed pass, or a market
+            # that opened with two new bars at once). The order may have FILLED in the meantime:
+            # check before cancelling, and check again after, because a cancel can lose the race.
+            fill = None
+            if paper:
+                fill = broker.fill_of(o["entry_order_id"])
+                if fill is None:
+                    broker.cancel(o["entry_order_id"]); broker.ib.sleep(2)
+                    fill = broker.fill_of(o["entry_order_id"])
+            if fill is None:
+                log_trade("rest_stale", s, contract=local, dir=d, bar_time=iso(o.get("placed_after", last_ts)),
+                          engine_px=o["trigger"], note="order outlived its bar; cancelled, not interpreted")
+                continue
+            # a stale order filled. If the engine opened a trade this way on a bar after the order
+            # was placed and still holds it, adopt the position (late confirm); otherwise it is a
+            # scratch and the broker position is closed now. Never left behind.
+            stop_hit = broker.fill_of(o["stop_order_id"])
+            adopt = (op is not None and op["dir"] == d and int(T[op["t0"]]) > int(o.get("placed_after", -1))
+                     and s not in state["positions"])
+            log_trade("rest_stale_fill", s, contract=local, dir=d, qty=o["qty"], bar_time=iso(o.get("placed_after", last_ts)),
+                      engine_px=o["trigger"], actual_px=fill, stop=o["stop"], order_id=o["entry_order_id"],
+                      note="stale order filled; " + ("adopted, engine holds this trade" if adopt else "engine does not hold it; closing")
+                           + (f"; provisional stop filled {stop_hit:.6g}" if stop_hit is not None else ""))
+            if adopt:
+                et = int(T[op["t0"]])
+                P = dict(entry_ts=et, dir=d, entry=op["entry"], stop0=op["stop0"], stop=o["stop"],
+                         R=op["R"], phase=op["phase"], qty=o["qty"], con_id=c.conId if c else None, local=local,
+                         exchange=c.exchange if c else None, fill=fill, entry_order_id=o["entry_order_id"],
+                         stop_order_id=o["stop_order_id"], broker_closed=stop_hit if stop_hit is not None else None,
+                         opened=datetime.now(UTC).isoformat(timespec="seconds"), via="resting_stale")
+                state["positions"][s] = P
+                log_trade("confirm", s, contract=local, dir=d, qty=o["qty"], bar_time=iso(et),
+                          engine_px=op["entry"], actual_px=fill, stop=op["stop0"], R_px=op["R"],
+                          why=f"{op['kind']} line; {len(op['tch'])} touches; stop {op['stop_src']}",
+                          note="late confirm from a stale order; fill vs engine " + f"{(fill - op['entry']) * d / op['R']:+.3f}R"
+                               + (f"; tier {o['score']:+.3f}" if o.get("score") is not None else "")
+                               + (f"; stop {op['R'] / st.A[op['t0']]:.2f} ATR" if st.A[op['t0']] > 0 else ""))
+            else:
+                exit_px, oid, note = None, None, ""
+                if stop_hit is not None:
+                    exit_px, note = stop_hit, "closed by provisional stop"
+                else:
+                    exit_px, oid = broker.close(oc)
+                    if oid == "unknown":
+                        oid = None; note = "position request failed; orphan check will retry"
+                    else:
+                        broker.cancel(o["stop_order_id"])
+                        if exit_px is None:
+                            exit_px = broker.fill_of(o["stop_order_id"]); note = "already flat"
+                pnl_atr = ((exit_px - fill) * d / A) if exit_px is not None else None
+                log_trade("scratch", s, contract=local, dir=d, qty=o["qty"], bar_time=iso(last_ts),
+                          engine_px=o["trigger"], actual_px=fill, order_id=oid,
+                          note=(f"stale fill, engine did not confirm; exit {exit_px:.6g}, {pnl_atr:+.3f} ATR " if exit_px is not None
+                                else "stale fill, engine did not confirm; exit unknown ") + note)
             continue
         fill, stop_hit = None, None
         if paper:
@@ -922,10 +1014,13 @@ def settle_resting(s, state, broker, st, T, op, details, tick):
             if stop_hit is not None:
                 exit_px, note = stop_hit, "closed by provisional stop"
             elif paper:
-                broker.cancel(o["stop_order_id"])
                 exit_px, oid = broker.close(oc)
-                if exit_px is None:
-                    exit_px = broker.fill_of(o["stop_order_id"]); note = "already flat"
+                if oid == "unknown":
+                    oid = None; note = "position request failed; orphan check will retry"
+                else:
+                    broker.cancel(o["stop_order_id"])
+                    if exit_px is None:
+                        exit_px = broker.fill_of(o["stop_order_id"]); note = "already flat"
             else:
                 exit_px = C
             pnl_atr = ((exit_px - fill) * d / A) if exit_px is not None else None
@@ -971,7 +1066,7 @@ def place_resting(s, state, broker, st, taken, op, details, tick):
         spx = round_stop(o["stop"], tick, d)
         rec = dict(dir=d, trigger=trigger, stop=spx, edge=list(o["edge"]), line_level=o["line_level"],
                    refit_level=o["refit_level"], qty=QTY, placed_after=last_ts, entry_order_id=None,
-                   stop_order_id=None, score=score, stop_atr=stop_atr)
+                   stop_order_id=None, score=score, stop_atr=stop_atr, con_id=c.conId if c else -1)
         if paper:
             rec["entry_order_id"], rec["stop_order_id"] = broker.place_resting(oc, d, QTY, trigger, spx, oca)
         placed.append(rec)
@@ -1065,9 +1160,52 @@ def run_pass(broker, state, catalog, syms):
             log_event(f"[{s}] ERROR {e}\n{traceback.format_exc()}")
         finally:
             save_state(state)
+    orphans = reconcile_broker(broker, state) if (broker is not None and MODE == "paper") else ""
+    save_state(state)
     held = ", ".join(f"{k}{'+' if v['dir'] > 0 else '-'}" for k, v in state["positions"].items())
     log_event(f"pass done in {time.time() - t_start:.0f}s | held {len(state['positions'])}: {held or 'none'} "
-              f"| excluded {len(state['excluded'])}")
+              f"| excluded {len(state['excluded'])}" + (f" | BROKER MISMATCH: {orphans}" if orphans else " | broker ok"))
+
+
+def reconcile_broker(broker, state):
+    """Compare what IBKR holds with what the bot thinks it holds, every pass. A broker
+    position with no bot position and no resting order behind it is an orphan: logged the
+    first time it is seen, flattened (and its orders cancelled) the second time, so a fill
+    that lands between settle and this check gets one pass to be interpreted normally.
+    Returns a short text of mismatches for the pass summary, empty when all is well."""
+    bp = broker.all_positions()
+    if bp is None:
+        return "position request failed"
+    held = {P.get("con_id"): s for s, P in state["positions"].items() if P.get("fill") is not None}
+    resting = {int(o.get("con_id") or -1) for lst in state.get("resting", {}).values() for o in lst}
+    seen = state.setdefault("orphan_seen", {})
+    out = []
+    for conid, (qty, local) in bp.items():
+        if conid in held or conid in resting:
+            continue
+        key = str(conid); seen[key] = seen.get(key, 0) + 1
+        if seen[key] == 1:
+            log_trade("orphan_position", local, contract=local, qty=qty, note="broker holds it, bot does not; flattened next pass if still there")
+            out.append(f"{local} {qty:+d} (new)")
+            continue
+        try:
+            c = broker.contract_by_conid(conid)
+            n = broker.cancel_all_for(conid)
+            px, oid = broker.close(broker.order_contract(conid, c.exchange, c.currency))
+            log_trade("orphan_closed", local, contract=local, qty=qty, actual_px=px, order_id=oid if oid != "unknown" else None,
+                      note=f"flattened an untracked broker position; {n} orders cancelled" + ("" if px is not None else "; close unconfirmed, manual check"))
+            out.append(f"{local} {qty:+d} closed @ {px}")
+        except Exception as e:
+            log_event(f"orphan close failed for {local}: {e}")
+            out.append(f"{local} {qty:+d} close failed")
+    for key in list(seen):
+        if int(key) not in bp:
+            seen.pop(key)
+    # the other direction: the bot thinks it holds something the broker does not
+    for conid, s in held.items():
+        if conid not in bp and state["positions"][s].get("broker_closed") is None:
+            out.append(f"{s} held by bot, flat at broker")
+    return "; ".join(out)
 
 
 def next_run(now):
