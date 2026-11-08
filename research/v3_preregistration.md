@@ -92,5 +92,26 @@ ADX and breadth on 3 touch trades only (passes but adds 0.025R over the frozen m
 ## Rules
 
 - No new holdout read before April, and in April only the reads listed above.
-- No change to the paper bot's code or configuration until the run ends.
+- No change to the paper bot's strategy or configuration until the run ends. Operational
+  fixes (order handling, reconciliation, contract specs) are allowed, logged here, and
+  deployed with the markets closed.
 - Any idea that comes up before April is appended here with its test, not run.
+
+## Incident log
+
+- **2 Nov 2026, orphan broker positions.** Resting entry orders in markets with a daily
+  close (HE, KE, G) outlived their bar, the bot sent a cancel and forgot them, the cancel
+  lost the race at the next open and the orders filled. The broker held short HEZ6 (from
+  26 Oct), short KEZ6 (27 Oct) and long RZ6 (the G trade of 28 Oct, whose exit on 30 Oct
+  found "already flat" from a stale position list and cancelled the stop), while the bot's
+  state said flat. Found at the Monday check from the blank actual price on the G exit row.
+  Cleared by hand the same day (HE covered 59.95, KE 650.0, RZ6 sold 86.32, global cancel
+  of the two stray stops). Scoring unchanged: HE and KE were never bot trades, G is scored
+  at the engine exit (+0.35R). Paper account P&L and the trade log diverge by these three.
+- **8 Nov 2026, live_ibkr.py deployed** (commit 11c4159, service restarted 14:22 UTC,
+  first pass "broker ok"): stale orders checked for fills before and after cancelling, a
+  stale fill adopted if the engine holds the trade or closed at once; exits on a fresh
+  position request with the stop cancelled only after the broker answers, unknown never
+  treated as flat; every pass ends with a broker vs bot reconciliation (orphan logged on
+  first sight, flattened on the second). New row types: rest_stale_fill, orphan_position,
+  orphan_closed, error.
